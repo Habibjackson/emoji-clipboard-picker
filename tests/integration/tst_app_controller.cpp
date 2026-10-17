@@ -5,11 +5,39 @@
 #include <QBuffer>
 #include <QGuiApplication>
 #include <QImage>
+#include <QLoggingCategory>
 #include <QMimeData>
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QUrl>
 #include <QtTest>
+
+namespace {
+QStringList *capturedMessages = nullptr;
+
+void captureMessage(QtMsgType, const QMessageLogContext &, const QString &message)
+{
+    if (capturedMessages)
+        capturedMessages->append(message);
+}
+
+struct MessageCapture
+{
+    explicit MessageCapture(QStringList &messages)
+        : previous(qInstallMessageHandler(captureMessage))
+    {
+        capturedMessages = &messages;
+    }
+
+    ~MessageCapture()
+    {
+        capturedMessages = nullptr;
+        qInstallMessageHandler(previous);
+    }
+
+    QtMessageHandler previous;
+};
+}
 
 class AppControllerTest : public QObject
 {
@@ -26,6 +54,7 @@ private slots:
     void newerIdenticalEmojiCopyIsCaptured();
     void snapshotsSupportedClipboardBeforeEmoji();
     void pasteShortcutOverridePersists();
+    void doesNotLogClipboardPayload();
 };
 
 void AppControllerTest::capturesAndCopies()
@@ -413,6 +442,33 @@ void AppControllerTest::pasteShortcutOverridePersists()
     }
     QCoreApplication::setOrganizationName(previousOrganization);
     QCoreApplication::setApplicationName(previousApplication);
+}
+
+void AppControllerTest::doesNotLogClipboardPayload()
+{
+    QTemporaryDir directory;
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QVERIFY(store.open());
+    auto *clipboard = QGuiApplication::clipboard();
+    clipboard->clear();
+    AppController controller(&store, QStringLiteral("clipboard"));
+    const QString sentinel = QStringLiteral("synthetic-private-payload-6f9a21");
+    QStringList messages;
+    {
+        MessageCapture capture(messages);
+        clipboard->setText(sentinel);
+        controller.captureNow();
+        QCOMPARE(store.entries().first().text, sentinel);
+
+        auto *invalidImage = new QMimeData;
+        invalidImage->setData(QStringLiteral("image/jpeg"),
+                              QByteArray::fromHex("ffd8ff") + sentinel.toUtf8());
+        clipboard->setMimeData(invalidImage);
+        controller.captureNow();
+        QCOMPARE(controller.status(), QStringLiteral("Image could not be decoded for history"));
+    }
+    QVERIFY2(!messages.join(QLatin1Char('\n')).contains(sentinel),
+             "Clipboard payload appeared in a diagnostic message");
 }
 
 QTEST_MAIN(AppControllerTest)

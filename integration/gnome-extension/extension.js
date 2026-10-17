@@ -164,7 +164,7 @@ export default class EmojiKeyboardExtension extends Extension {
             target.get_wm_class(), shortcutMode);
         try {
             target.activate(global.get_current_time());
-        } catch (error) {
+        } catch {
             finish('focus-failed');
             return;
         }
@@ -179,8 +179,8 @@ export default class EmojiKeyboardExtension extends Extension {
                 try {
                     this._sendPaste(shortcut);
                     return finish('sent', shortcut);
-                } catch (error) {
-                    console.warn(`Emoji Keyboard could not send paste: ${error.message}`);
+                } catch {
+                    console.warn('Emoji Keyboard could not send paste');
                     return finish('input-failed');
                 }
             }
@@ -223,8 +223,8 @@ export default class EmojiKeyboardExtension extends Extension {
                     clipboard.set_content(type, mimeType, new GLib.Bytes(bytes));
                 }
                 finish('restored');
-            } catch (error) {
-                console.warn(`Emoji Keyboard could not restore clipboard: ${error.message}`);
+            } catch {
+                console.warn('Emoji Keyboard could not restore clipboard');
                 finish('unavailable');
             }
         });
@@ -246,9 +246,9 @@ export default class EmojiKeyboardExtension extends Extension {
                 try {
                     const reply = connection.call_finish(result);
                     this._pickerPid = reply.deep_unpack()[0];
-                } catch (error) {
+                } catch {
                     this._targetWindow = null;
-                    console.warn(`Emoji Keyboard could not open: ${error.message}`);
+                    console.warn('Emoji Keyboard could not open');
                 }
             });
     }
@@ -273,8 +273,8 @@ export default class EmojiKeyboardExtension extends Extension {
             -1, null, (connection, result) => {
                 try {
                     connection.call_finish(result);
-                } catch (error) {
-                    console.warn(`Emoji Keyboard could not open: ${error.message}`);
+                } catch {
+                    console.warn('Emoji Keyboard could not open');
                 }
             });
     }
@@ -305,9 +305,9 @@ export default class EmojiKeyboardExtension extends Extension {
                 try {
                     connection.call_finish(result);
                     this._reportedActivationError = false;
-                } catch (error) {
+                } catch {
                     if (!this._reportedActivationError) {
-                        console.warn(`Emoji Keyboard could not monitor clipboard: ${error.message}`);
+                        console.warn('Emoji Keyboard could not monitor clipboard');
                         this._reportedActivationError = true;
                     }
                 }

@@ -81,12 +81,12 @@
 ## 8. Verification and release checklist
 
 - [x] Run a clean CMake build with Qt 6.11.1, `qmllint`, and automated storage/model tests.
-- [ ] Test 6th pin rejection; 21st unpinned eviction; recopy of pinned and unpinned entries; unpin at capacity; deletion; clear recent; pause/resume; and persistence after app restart and logout/login.
-- [ ] Test UTF-8 text, multiline text, duplicate text, PNG/JPEG images, unsupported file-copy MIME types, oversized content, and corrupted or outdated database recovery.
+- [ ] Test 6th pin rejection; 21st unpinned eviction; recopy of pinned and unpinned entries; unpin at capacity; deletion; clear recent; pause/resume; and persistence after app restart and logout/login. (Automated tests cover each storage/controller case and reopening SQLite; a real logout/login check remains.)
+- [x] Test UTF-8 text, multiline text, duplicate text, PNG/JPEG images, unsupported file-copy MIME types, oversized content, and corrupted or outdated database recovery. (Qt tests cover these inputs, version 0 migration, corrupt files, and rejection of newer schemas.)
 - [ ] On GNOME Wayland, test both shortcuts from GTK, Qt Wayland, XWayland, and terminal windows; verify focus restoration, paste, image previews, and clipboard preservation behavior.
 - [x] On X11, test XFixes capture, shortcut grabs, text/image paste, and startup in a separate X11 session or automated Xvfb harness. (Automated Xvfb test passes with a separate target process; the compiled picker also passes an X11 smoke launch.)
-- [ ] Test both shortcut-conflict setup and uninstall restoration, including the case where the user changes a binding after installation.
-- [ ] Verify no clipboard payload appears in logs, no data is sent over the network, file permissions are user-only, and failures are explained in the UI.
+- [ ] Test both shortcut-conflict setup and uninstall restoration, including the case where the user changes a binding after installation. (Installer tests pass with simulated GSettings arrays; live GNOME setup/removal remains.)
+- [x] Verify no clipboard payload appears in logs, no data is sent over the network, file permissions are user-only, and failures are explained in the UI. (Synthetic-payload log test, source audit for network calls, private-file tests, and controller/X11 failure tests pass; Shell warnings use fixed messages.)
 - [x] Write README instructions for build, install, use, troubleshooting, supported desktops, known paste/restoration limits, and data removal.
 
 ## Technical references

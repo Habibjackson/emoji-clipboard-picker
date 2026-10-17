@@ -2,6 +2,7 @@
 
 #include <QBuffer>
 #include <QCryptographicHash>
+#include <QFile>
 #include <QFileInfo>
 #include <QImage>
 #include <QSqlDatabase>
@@ -23,6 +24,9 @@ private slots:
     void migratesUnversionedDatabase();
     void rejectsIncompatibleDatabase();
     void clearAllKeepsEmojiRecents();
+    void unpinnedEvictionAndRecopy();
+    void unicodeDeletionAndRestart();
+    void rejectsCorruptAndFutureDatabases();
 };
 
 void HistoryStoreTest::limitsAndPersistence()
@@ -238,6 +242,112 @@ void HistoryStoreTest::clearAllKeepsEmojiRecents()
     QVERIFY(reopened.open());
     QVERIFY(reopened.entries().isEmpty());
     QCOMPARE(reopened.recentEmoji(), QStringList { QString::fromUtf8("🎉") });
+}
+
+void HistoryStoreTest::unpinnedEvictionAndRecopy()
+{
+    QTemporaryDir directory;
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QVERIFY(store.open());
+    for (int i = 0; i < 20; ++i)
+        QVERIFY(store.addText(QStringLiteral("item-%1").arg(i)));
+    const QList<ClipboardEntry> initial = store.entries();
+    const qint64 firstId = initial.last().id;
+    const qint64 secondId = initial.at(18).id;
+    QVERIFY(store.addText(QStringLiteral("item-20")));
+    const QList<ClipboardEntry> afterEviction = store.entries();
+    QCOMPARE(afterEviction.size(), 20);
+    QVERIFY(std::none_of(afterEviction.cbegin(), afterEviction.cend(),
+                         [firstId](const ClipboardEntry &entry) { return entry.id == firstId; }));
+
+    QVERIFY(store.addText(QStringLiteral("item-1")));
+    QCOMPARE(store.entries().first().id, secondId);
+    QVERIFY(store.addText(QStringLiteral("item-21")));
+    const QList<ClipboardEntry> afterRecopy = store.entries();
+    QCOMPARE(afterRecopy.size(), 20);
+    QVERIFY(std::any_of(afterRecopy.cbegin(), afterRecopy.cend(),
+                        [secondId](const ClipboardEntry &entry) { return entry.id == secondId; }));
+    QVERIFY(std::none_of(afterRecopy.cbegin(), afterRecopy.cend(),
+                         [](const ClipboardEntry &entry) { return entry.text == QStringLiteral("item-2"); }));
+
+    QList<qint64> pinnedIds;
+    for (int i = 0; i < 5; ++i) {
+        pinnedIds.append(store.entries().at(i).id);
+        QVERIFY(store.setPinned(pinnedIds.last(), true));
+    }
+    QVERIFY(!store.setPinned(store.entries().at(5).id, true));
+    QVERIFY(store.setPinned(pinnedIds.first(), false));
+    const QList<ClipboardEntry> afterUnpin = store.entries();
+    QCOMPARE(afterUnpin.size(), 20);
+    QVERIFY(std::any_of(afterUnpin.cbegin(), afterUnpin.cend(),
+                        [id = pinnedIds.first()](const ClipboardEntry &entry) {
+                            return entry.id == id && !entry.pinned;
+                        }));
+    QVERIFY(store.remove(pinnedIds.last()));
+    QCOMPARE(store.entries().size(), 19);
+    QVERIFY(store.clearRecent());
+    QCOMPARE(store.entries().size(), 3);
+    for (const ClipboardEntry &entry : store.entries())
+        QVERIFY(entry.pinned);
+}
+
+void HistoryStoreTest::unicodeDeletionAndRestart()
+{
+    QTemporaryDir directory;
+    const QString path = directory.filePath(QStringLiteral("history.sqlite"));
+    const QString text = QString::fromUtf8("first line\nनमस्ते 😀\nthird line");
+    qint64 id = 0;
+    {
+        HistoryStore store(path);
+        QVERIFY(store.open());
+        QVERIFY(store.addText(text));
+        id = store.entries().first().id;
+        QCOMPARE(store.entries().first().text, text);
+        QCOMPARE(store.payload(id), text.toUtf8());
+    }
+    {
+        HistoryStore reopened(path);
+        QVERIFY(reopened.open());
+        QCOMPARE(reopened.entries().first().id, id);
+        QCOMPARE(reopened.entries().first().text, text);
+        QVERIFY(reopened.remove(id));
+        QVERIFY(reopened.entries().isEmpty());
+    }
+    HistoryStore reopened(path);
+    QVERIFY(reopened.open());
+    QVERIFY(reopened.entries().isEmpty());
+}
+
+void HistoryStoreTest::rejectsCorruptAndFutureDatabases()
+{
+    QTemporaryDir directory;
+    const QString corruptPath = directory.filePath(QStringLiteral("corrupt.sqlite"));
+    {
+        QFile corrupt(corruptPath);
+        QVERIFY(corrupt.open(QIODevice::WriteOnly));
+        QCOMPARE(corrupt.write("not a SQLite database"), qint64(21));
+    }
+    HistoryStore corrupt(corruptPath);
+    QVERIFY(!corrupt.open());
+    QVERIFY(!corrupt.errorString().isEmpty());
+    QFile original(corruptPath);
+    QVERIFY(original.open(QIODevice::ReadOnly));
+    QCOMPARE(original.readAll(), QByteArray("not a SQLite database"));
+
+    const QString futurePath = directory.filePath(QStringLiteral("future.sqlite"));
+    const QString connection = QStringLiteral("future-schema-test");
+    {
+        QSqlDatabase database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        database.setDatabaseName(futurePath);
+        QVERIFY(database.open());
+        QSqlQuery query(database);
+        QVERIFY(query.exec(QStringLiteral("PRAGMA user_version = 99")));
+        database.close();
+    }
+    QSqlDatabase::removeDatabase(connection);
+    HistoryStore future(futurePath);
+    QVERIFY(!future.open());
+    QVERIFY(future.errorString().contains(QStringLiteral("newer schema")));
 }
 
 QTEST_GUILESS_MAIN(HistoryStoreTest)
