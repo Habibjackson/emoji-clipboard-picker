@@ -5,12 +5,17 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QSet>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QStandardPaths>
 #include <QUuid>
 
 #include <utility>
+
+namespace {
+constexpr int kSchemaVersion = 1;
+}
 
 HistoryStore::HistoryStore(QString databasePath)
     : m_databasePath(std::move(databasePath))
@@ -56,6 +61,12 @@ bool HistoryStore::open()
         return false;
     }
 
+    if (!exec(QStringLiteral("PRAGMA secure_delete = ON"))
+        || !exec(QStringLiteral("PRAGMA busy_timeout = 2000"))) {
+        m_database.close();
+        return false;
+    }
+
     QSqlQuery version(m_database);
     if (!version.exec(QStringLiteral("PRAGMA user_version")) || !version.next()) {
         setError(version.lastError().text());
@@ -63,31 +74,81 @@ bool HistoryStore::open()
         return false;
     }
     const int schemaVersion = version.value(0).toInt();
-    if (schemaVersion > 1) {
+    if (schemaVersion < 0 || schemaVersion > kSchemaVersion) {
         setError(QStringLiteral("History database uses a newer schema"));
         m_database.close();
         return false;
     }
 
-    if (!exec(QStringLiteral("PRAGMA secure_delete = ON"))
-        || !exec(QStringLiteral("PRAGMA busy_timeout = 2000"))
-        || !exec(QStringLiteral("CREATE TABLE IF NOT EXISTS clipboard_entries ("
+    if (!migrateSchema(schemaVersion) || !validateSchema()) {
+        m_database.close();
+        return false;
+    }
+
+    m_error.clear();
+    return true;
+}
+
+bool HistoryStore::migrateSchema(int version)
+{
+    if (version == kSchemaVersion)
+        return true;
+    if (!m_database.transaction()) {
+        setError(m_database.lastError().text());
+        return false;
+    }
+    if (!exec(QStringLiteral("CREATE TABLE IF NOT EXISTS clipboard_entries ("
                                 "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                                 "kind TEXT NOT NULL CHECK(kind IN ('text', 'image')) ,"
                                 "mime TEXT NOT NULL, payload BLOB NOT NULL, preview BLOB,"
                                 "hash BLOB NOT NULL, pinned INTEGER NOT NULL DEFAULT 0,"
                                 "captured_at INTEGER NOT NULL, used_at INTEGER NOT NULL,"
                                 "UNIQUE(kind, hash))"))
-        || !exec(QStringLiteral("CREATE INDEX IF NOT EXISTS clipboard_order "
-                                "ON clipboard_entries(pinned, used_at DESC)"))
         || !exec(QStringLiteral("CREATE TABLE IF NOT EXISTS emoji_recents ("
                                 "symbol TEXT PRIMARY KEY, used_at INTEGER NOT NULL)"))
-        || (schemaVersion == 0 && !exec(QStringLiteral("PRAGMA user_version = 1")))) {
-        m_database.close();
+        || !validateSchema()
+        || !exec(QStringLiteral("CREATE INDEX IF NOT EXISTS clipboard_order "
+                                "ON clipboard_entries(pinned, used_at DESC)"))
+        || !exec(QStringLiteral("PRAGMA user_version = 1"))) {
+        m_database.rollback();
         return false;
     }
+    if (!m_database.commit()) {
+        setError(m_database.lastError().text());
+        m_database.rollback();
+        return false;
+    }
+    return true;
+}
 
-    m_error.clear();
+bool HistoryStore::validateSchema()
+{
+    return tableHasColumns(QStringLiteral("clipboard_entries"),
+                           { QStringLiteral("id"), QStringLiteral("kind"),
+                             QStringLiteral("mime"), QStringLiteral("payload"),
+                             QStringLiteral("preview"), QStringLiteral("hash"),
+                             QStringLiteral("pinned"), QStringLiteral("captured_at"),
+                             QStringLiteral("used_at") })
+        && tableHasColumns(QStringLiteral("emoji_recents"),
+                           { QStringLiteral("symbol"), QStringLiteral("used_at") });
+}
+
+bool HistoryStore::tableHasColumns(const QString &table, const QStringList &columns)
+{
+    QSqlQuery query(m_database);
+    if (!query.exec(QStringLiteral("PRAGMA table_info(%1)").arg(table))) {
+        setError(query.lastError().text());
+        return false;
+    }
+    QSet<QString> actual;
+    while (query.next())
+        actual.insert(query.value(1).toString());
+    for (const QString &column : columns) {
+        if (!actual.contains(column)) {
+            setError(QStringLiteral("History database has an incompatible schema"));
+            return false;
+        }
+    }
     return true;
 }
 
@@ -113,7 +174,9 @@ QList<ClipboardEntry> HistoryStore::entries() const
         return result;
 
     QSqlQuery query(m_database);
-    if (!query.exec(QStringLiteral("SELECT id, kind, payload, pinned, used_at "
+    if (!query.exec(QStringLiteral("SELECT id, kind, mime, "
+                                   "CASE WHEN kind = 'text' THEN payload END, "
+                                   "hash, pinned, captured_at, used_at "
                                    "FROM clipboard_entries ORDER BY pinned DESC, used_at DESC, id DESC"))) {
         return result;
     }
@@ -121,10 +184,13 @@ QList<ClipboardEntry> HistoryStore::entries() const
         ClipboardEntry entry;
         entry.id = query.value(0).toLongLong();
         entry.kind = query.value(1).toString();
+        entry.mime = query.value(2).toString();
         if (entry.kind == QStringLiteral("text"))
-            entry.text = QString::fromUtf8(query.value(2).toByteArray());
-        entry.pinned = query.value(3).toBool();
-        entry.usedAt = query.value(4).toLongLong();
+            entry.text = QString::fromUtf8(query.value(3).toByteArray());
+        entry.hash = query.value(4).toByteArray();
+        entry.pinned = query.value(5).toBool();
+        entry.capturedAt = query.value(6).toLongLong();
+        entry.usedAt = query.value(7).toLongLong();
         result.append(std::move(entry));
     }
     return result;

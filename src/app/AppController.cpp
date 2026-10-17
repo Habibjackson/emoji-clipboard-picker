@@ -7,10 +7,125 @@
 #include <QCryptographicHash>
 #include <QGuiApplication>
 #include <QImage>
+#include <QImageReader>
 #include <QMimeData>
+#include <QSet>
 #include <QTimer>
 
 #include <utility>
+
+namespace {
+constexpr qsizetype kMaxTextBytes = 1024 * 1024;
+constexpr qsizetype kMaxImageBytes = 10 * 1024 * 1024;
+constexpr qint64 kMaxImagePixels = 32 * 1024 * 1024;
+
+enum class ImageIssue { None, NoImage, Empty, Unsupported, Invalid, TooLarge };
+
+struct NormalizedImage
+{
+    QImage image;
+    QByteArray png;
+    ImageIssue issue = ImageIssue::NoImage;
+};
+
+bool imageTooLarge(const QSize &size)
+{
+    return !size.isValid() || size.width() > 8192 || size.height() > 8192
+        || qint64(size.width()) * size.height() > kMaxImagePixels;
+}
+
+NormalizedImage normalizeImage(const QMimeData *mime)
+{
+    NormalizedImage result;
+    const QStringList formats = mime->formats();
+    static const QSet<QString> bitmapTypes = {
+        QStringLiteral("image/png"), QStringLiteral("image/jpeg"),
+        QStringLiteral("image/bmp"), QStringLiteral("image/x-ms-bmp"),
+        QStringLiteral("image/gif"), QStringLiteral("image/webp"),
+        QStringLiteral("image/tiff")
+    };
+    bool offeredImage = mime->hasImage();
+    bool offeredSupported = false;
+    for (const QString &format : formats) {
+        if (!format.startsWith(QLatin1String("image/")))
+            continue;
+        offeredImage = true;
+        if (!bitmapTypes.contains(format.toLower()))
+            continue;
+        offeredSupported = true;
+        QByteArray encoded = mime->data(format);
+        if (encoded.isEmpty()) {
+            result.issue = ImageIssue::Empty;
+            continue;
+        }
+        if (encoded.size() > kMaxImageBytes) {
+            result.issue = ImageIssue::TooLarge;
+            continue;
+        }
+        QBuffer buffer(&encoded);
+        if (!buffer.open(QIODevice::ReadOnly)) {
+            result.issue = ImageIssue::Invalid;
+            continue;
+        }
+        const QByteArray imageFormat = format == QLatin1String("image/x-ms-bmp")
+            ? QByteArray("BMP") : format.mid(6).toLatin1();
+        QImageReader reader(&buffer, imageFormat);
+        reader.setAutoDetectImageFormat(false);
+        const QSize size = reader.size();
+        if (!size.isValid()) {
+            result.issue = ImageIssue::Invalid;
+            continue;
+        }
+        if (imageTooLarge(size)) {
+            result.issue = ImageIssue::TooLarge;
+            continue;
+        }
+        result.image = reader.read();
+        if (result.image.isNull()) {
+            result.issue = ImageIssue::Invalid;
+            continue;
+        }
+        break;
+    }
+    if (result.image.isNull() && mime->hasFormat(QStringLiteral("application/x-qt-image"))) {
+        offeredImage = true;
+        offeredSupported = true;
+        result.image = qvariant_cast<QImage>(mime->imageData());
+        if (result.image.isNull())
+            result.issue = ImageIssue::Invalid;
+        else if (imageTooLarge(result.image.size()))
+            result.issue = ImageIssue::TooLarge;
+    }
+    if (result.image.isNull()) {
+        if (!offeredImage)
+            result.issue = ImageIssue::NoImage;
+        else if (!offeredSupported)
+            result.issue = ImageIssue::Unsupported;
+        return result;
+    }
+    if (imageTooLarge(result.image.size())) {
+        result.issue = ImageIssue::TooLarge;
+        return result;
+    }
+    QBuffer output(&result.png);
+    output.open(QIODevice::WriteOnly);
+    if (!result.image.save(&output, "PNG")) {
+        result.issue = ImageIssue::Invalid;
+    } else if (result.png.size() > kMaxImageBytes) {
+        result.issue = ImageIssue::TooLarge;
+    } else {
+        result.issue = ImageIssue::None;
+    }
+    return result;
+}
+
+bool privateClipboard(const QMimeData *mime)
+{
+    return mime->hasFormat(QStringLiteral("application/x-kde-passwordManagerHint"))
+        || mime->hasFormat(QStringLiteral("application/x-keepassxc-secret"))
+        || mime->hasFormat(QStringLiteral("x-special/gnome-copied-files"));
+}
+}
 
 AppController::AppController(HistoryStore *store, QString initialView, QObject *parent)
     : QObject(parent)
@@ -263,31 +378,20 @@ void AppController::snapshotClipboardBeforeEmoji(const QString &symbol)
 {
     discardEmojiClipboardSnapshot();
     const QMimeData *mime = m_clipboard->mimeData();
-    if (!mime || mime->hasUrls()
-        || mime->hasFormat(QStringLiteral("application/x-kde-passwordManagerHint"))
-        || mime->hasFormat(QStringLiteral("application/x-keepassxc-secret"))
-        || mime->hasFormat(QStringLiteral("x-special/gnome-copied-files"))) {
+    if (!mime || mime->hasUrls() || privateClipboard(mime)) {
         return;
     }
 
-    if (mime->hasImage()) {
-        const QImage image = m_clipboard->image();
-        const qint64 pixels = qint64(image.width()) * image.height();
-        if (image.isNull() || image.width() > 8192 || image.height() > 8192
-            || pixels > 32 * 1024 * 1024) {
+    const NormalizedImage normalized = normalizeImage(mime);
+    if (normalized.issue != ImageIssue::NoImage) {
+        if (normalized.issue != ImageIssue::None)
             return;
-        }
-        QByteArray png;
-        QBuffer buffer(&png);
-        buffer.open(QIODevice::WriteOnly);
-        if (!image.save(&buffer, "PNG") || png.size() > 10 * 1024 * 1024)
-            return;
-        m_snapshotImage = image;
+        m_snapshotImage = normalized.image;
         m_snapshotKind = SnapshotKind::Image;
     } else if (mime->hasText()) {
         const QString text = mime->text();
         const QByteArray utf8 = text.toUtf8();
-        if (utf8.isEmpty() || utf8.size() > 1024 * 1024)
+        if (utf8.isEmpty() || utf8.size() > kMaxTextBytes)
             return;
         m_snapshotText = text;
         m_snapshotKind = SnapshotKind::Text;
@@ -302,51 +406,56 @@ void AppController::captureCurrentClipboard()
     if (m_paused || !m_store->isOpen())
         return;
     const QMimeData *mime = m_clipboard->mimeData();
-    if (!mime || mime->hasUrls()
-        || mime->hasFormat(QStringLiteral("application/x-kde-passwordManagerHint"))
-        || mime->hasFormat(QStringLiteral("application/x-keepassxc-secret"))
-        || mime->hasFormat(QStringLiteral("x-special/gnome-copied-files"))) {
+    if (!mime)
+        return;
+    if (privateClipboard(mime)) {
+        setStatus(tr("Private clipboard item was skipped"));
+        return;
+    }
+    if (mime->hasUrls()) {
+        setStatus(tr("File copy was skipped"));
         return;
     }
 
-    if (mime->hasImage()) {
-        const QImage image = m_clipboard->image();
-        const qint64 pixels = qint64(image.width()) * image.height();
-        if (image.isNull() || image.width() > 8192 || image.height() > 8192
-            || pixels > 32 * 1024 * 1024) {
+    const NormalizedImage normalized = normalizeImage(mime);
+    if (normalized.issue != ImageIssue::NoImage) {
+        if (normalized.issue == ImageIssue::TooLarge)
             setStatus(tr("Image is too large for history"));
+        else if (normalized.issue == ImageIssue::Unsupported)
+            setStatus(tr("Unsupported image format was skipped"));
+        else if (normalized.issue == ImageIssue::Empty)
+            setStatus(tr("Empty image was skipped"));
+        else if (normalized.issue == ImageIssue::Invalid)
+            setStatus(tr("Image could not be decoded for history"));
+        if (normalized.issue != ImageIssue::None)
             return;
-        }
-        QByteArray png;
-        QBuffer buffer(&png);
-        buffer.open(QIODevice::WriteOnly);
-        if (!image.save(&buffer, "PNG") || png.size() > 10 * 1024 * 1024) {
-            setStatus(tr("Image is too large for history"));
-            return;
-        }
-        if (isOwnClipboardContent(QStringLiteral("image"), png))
+        if (isOwnClipboardContent(QStringLiteral("image"), normalized.png))
             return;
         QByteArray thumbnail;
         QBuffer thumbnailBuffer(&thumbnail);
         thumbnailBuffer.open(QIODevice::WriteOnly);
-        image.scaled(QSize(320, 180), Qt::KeepAspectRatio, Qt::SmoothTransformation)
+        normalized.image.scaled(QSize(320, 180), Qt::KeepAspectRatio, Qt::SmoothTransformation)
             .save(&thumbnailBuffer, "PNG");
-        if (m_store->addImage(png, thumbnail))
+        if (m_store->addImage(normalized.png, thumbnail))
             m_clipboardModel.reload();
         else
             setStatus(m_store->errorString());
         return;
     }
 
-    if (!mime->hasText())
+    if (!mime->hasText()) {
+        setStatus(tr("Unsupported clipboard format was skipped"));
         return;
+    }
     const QString text = mime->text();
     const QByteArray utf8 = text.toUtf8();
-    if (utf8.isEmpty())
+    if (utf8.isEmpty()) {
+        setStatus(tr("Empty clipboard item was skipped"));
         return;
+    }
     if (isOwnClipboardContent(QStringLiteral("text"), utf8))
         return;
-    if (utf8.size() > 1024 * 1024) {
+    if (utf8.size() > kMaxTextBytes) {
         setStatus(tr("Text is too large for history"));
         return;
     }

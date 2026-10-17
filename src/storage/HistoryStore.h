@@ -10,8 +10,11 @@ struct ClipboardEntry
 {
     qint64 id = 0;
     QString kind;
+    QString mime;
     QString text;
+    QByteArray hash;
     bool pinned = false;
+    qint64 capturedAt = 0;
     qint64 usedAt = 0;
 };
 
@@ -43,6 +46,9 @@ public:
     bool recordEmoji(const QString &symbol);
 
 private:
+    bool migrateSchema(int version);
+    bool validateSchema();
+    bool tableHasColumns(const QString &table, const QStringList &columns);
     bool addEntry(const QString &kind, const QString &mime, const QByteArray &data,
                   const QByteArray &thumbnail);
     bool trimUnpinned();

@@ -2,6 +2,7 @@
 #include "storage/HistoryStore.h"
 
 #include <QClipboard>
+#include <QBuffer>
 #include <QGuiApplication>
 #include <QImage>
 #include <QMimeData>
@@ -15,6 +16,8 @@ class AppControllerTest : public QObject
 
 private slots:
     void capturesAndCopies();
+    void capturesCommonMimeFormatsAndPrefersImage();
+    void skipsUnsafeOrUnsupportedClipboardItems();
     void snapshotsSupportedClipboardBeforeEmoji();
 };
 
@@ -66,6 +69,7 @@ void AppControllerTest::capturesAndCopies()
     QGuiApplication::clipboard()->setMimeData(files);
     controller.captureNow();
     QCOMPARE(store.entries().size(), 2);
+    QCOMPARE(controller.status(), QStringLiteral("File copy was skipped"));
 
     auto *secret = new QMimeData;
     secret->setText(QStringLiteral("synthetic password"));
@@ -73,11 +77,96 @@ void AppControllerTest::capturesAndCopies()
     QGuiApplication::clipboard()->setMimeData(secret);
     controller.captureNow();
     QCOMPARE(store.entries().size(), 2);
+    QCOMPARE(controller.status(), QStringLiteral("Private clipboard item was skipped"));
 
     controller.setPaused(true);
     QGuiApplication::clipboard()->setText(QStringLiteral("do not save this"));
     controller.captureNow();
     QCOMPARE(store.entries().size(), 2);
+}
+
+void AppControllerTest::capturesCommonMimeFormatsAndPrefersImage()
+{
+    QTemporaryDir directory;
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QVERIFY(store.open());
+    auto *clipboard = QGuiApplication::clipboard();
+    clipboard->clear();
+    AppController controller(&store, QStringLiteral("clipboard"));
+
+    const QStringList formats = { QStringLiteral("PNG"), QStringLiteral("JPEG"),
+                                  QStringLiteral("BMP") };
+    for (int i = 0; i < formats.size(); ++i) {
+        QImage image(40, 30, QImage::Format_RGB32);
+        image.fill(QColor::fromHsv(i * 100, 230, 220));
+        QByteArray encoded;
+        QBuffer buffer(&encoded);
+        QVERIFY(buffer.open(QIODevice::WriteOnly));
+        QVERIFY(image.save(&buffer, formats.at(i).toLatin1().constData()));
+
+        auto *mime = new QMimeData;
+        mime->setData(QStringLiteral("image/%1").arg(formats.at(i).toLower()), encoded);
+        mime->setText(QStringLiteral("text alternative %1").arg(i));
+        clipboard->setMimeData(mime);
+        controller.captureNow();
+
+        QCOMPARE(store.entries().size(), i + 1);
+        const ClipboardEntry entry = store.entries().first();
+        QCOMPARE(entry.kind, QStringLiteral("image"));
+        QCOMPARE(entry.mime, QStringLiteral("image/png"));
+        QVERIFY(entry.text.isEmpty());
+        QCOMPARE(QImage::fromData(store.payload(entry.id), "PNG").size(), image.size());
+        QVERIFY(!store.preview(entry.id).isEmpty());
+    }
+}
+
+void AppControllerTest::skipsUnsafeOrUnsupportedClipboardItems()
+{
+    QTemporaryDir directory;
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QVERIFY(store.open());
+    auto *clipboard = QGuiApplication::clipboard();
+    clipboard->clear();
+    AppController controller(&store, QStringLiteral("clipboard"));
+
+    clipboard->setText(QString(1024 * 1024 + 1, QLatin1Char('a')));
+    controller.captureNow();
+    QVERIFY(store.entries().isEmpty());
+    QCOMPARE(controller.status(), QStringLiteral("Text is too large for history"));
+
+    QImage tooWide(8193, 1, QImage::Format_RGB32);
+    tooWide.fill(Qt::red);
+    clipboard->setImage(tooWide);
+    controller.captureNow();
+    QVERIFY(store.entries().isEmpty());
+    QCOMPARE(controller.status(), QStringLiteral("Image is too large for history"));
+
+    auto *oversized = new QMimeData;
+    oversized->setData(QStringLiteral("image/png"), QByteArray(10 * 1024 * 1024 + 1, 'x'));
+    clipboard->setMimeData(oversized);
+    controller.captureNow();
+    QVERIFY(store.entries().isEmpty());
+    QCOMPARE(controller.status(), QStringLiteral("Image is too large for history"));
+
+    auto *unsupported = new QMimeData;
+    unsupported->setData(QStringLiteral("image/avif"), QByteArray("unsupported"));
+    unsupported->setText(QStringLiteral("should not save the text alternative"));
+    clipboard->setMimeData(unsupported);
+    controller.captureNow();
+    QVERIFY(store.entries().isEmpty());
+    QCOMPARE(controller.status(), QStringLiteral("Unsupported image format was skipped"));
+
+    auto *corrupt = new QMimeData;
+    corrupt->setData(QStringLiteral("image/jpeg"), QByteArray("not an image"));
+    clipboard->setMimeData(corrupt);
+    controller.captureNow();
+    QVERIFY(store.entries().isEmpty());
+    QCOMPARE(controller.status(), QStringLiteral("Image could not be decoded for history"));
+
+    clipboard->setText(QString());
+    controller.captureNow();
+    QVERIFY(store.entries().isEmpty());
+    QCOMPARE(controller.status(), QStringLiteral("Empty clipboard item was skipped"));
 }
 
 void AppControllerTest::snapshotsSupportedClipboardBeforeEmoji()
