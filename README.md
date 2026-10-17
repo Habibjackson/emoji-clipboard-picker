@@ -1,6 +1,6 @@
 # Emoji Keyboard for Linux
 
-Qt 6.11/QML emoji picker with local clipboard history. This first version lets you browse 3,963 Unicode Emoji 18.0 entries by category, search by name, copy emoji, and keep recently used emoji. It saves copied text and images across restarts, with up to five permanent pins and twenty unpinned items. The remaining desktop integration work is tracked in [TODO.md](TODO.md).
+Qt 6.11/QML emoji picker with local clipboard history. This first version lets you browse 3,963 Unicode Emoji 18.0 entries by category, search by English name or CLDR keyword, copy emoji, and keep recently used emoji. It saves copied text and images across restarts, with up to five permanent pins and twenty unpinned items. The remaining desktop integration work is tracked in [TODO.md](TODO.md).
 
 ## Build
 
@@ -52,7 +52,7 @@ The `.gitkeep` files preserve directories until their implementations are added.
 
 ## Emoji data
 
-The catalog is a pinned copy of Unicode's `emoji-test.txt` version 18.0. Its source, checksum, and separate Unicode License v3 notice are in [resources/emoji/README.md](resources/emoji/README.md). Emoji artwork is rendered by installed system fonts; no artwork is bundled.
+The catalog is a pinned copy of Unicode's `emoji-test.txt` version 18.0, with English names and search keywords from CLDR 48.2. Their sources, checksums, and separate Unicode License v3 notice are in [resources/emoji/README.md](resources/emoji/README.md). Emoji artwork is rendered by installed system fonts; no artwork is bundled.
 
 ## Contributing and license
 

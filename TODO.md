@@ -32,7 +32,7 @@
 ## 3. Build the emoji catalog and recents
 
 - [x] Import a pinned Unicode emoji data release containing fully qualified sequences, group/subgroup order, and names; document its version and license.
-- [ ] Add English names and searchable keywords from a compatible CLDR release, falling back to the Unicode name when an annotation is unavailable.
+- [x] Add English names and searchable keywords from a compatible CLDR release, falling back to the Unicode name when an annotation is unavailable. (Pinned CLDR 48.2 covers 3,944 catalog entries; the 19 newer Emoji 18.0 entries use their Unicode names.)
 - [x] Expose categories, emoji items, filtered search results, and recently used emoji through C++ models. Keep the exact selected skin-tone sequence in recents.
 - [ ] Group skin-tone variants behind a variant chooser so the category grid remains usable.
 - [x] Limit emoji recents to the 24 most recently selected sequences; update an existing sequence instead of duplicating it.

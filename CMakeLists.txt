@@ -36,6 +36,9 @@ endforeach()
 set_source_files_properties(resources/emoji/emoji-test.txt PROPERTIES
     QT_RESOURCE_ALIAS emoji-test.txt
 )
+set_source_files_properties(resources/emoji/cldr-en-48.2.tsv PROPERTIES
+    QT_RESOURCE_ALIAS cldr-en-48.2.tsv
+)
 set_source_files_properties(resources/icons/org.emojikeyboard.App.svg PROPERTIES
     QT_RESOURCE_ALIAS org.emojikeyboard.App.svg
 )
@@ -63,7 +66,7 @@ qt_add_qml_module(emoji-keyboard
 
 qt_add_resources(emoji-keyboard emoji_data
     PREFIX /data
-    FILES resources/emoji/emoji-test.txt
+    FILES resources/emoji/emoji-test.txt resources/emoji/cldr-en-48.2.tsv
 )
 qt_add_resources(emoji-keyboard app_icon
     PREFIX /icons
@@ -119,6 +122,18 @@ if(BUILD_TESTING)
     target_link_libraries(tst_history_store PRIVATE Qt6::Core Qt6::Gui Qt6::Sql Qt6::Test)
     add_test(NAME history_store COMMAND tst_history_store)
 
+    qt_add_executable(tst_emoji_model
+        tests/unit/tst_emoji_model.cpp
+        src/models/EmojiModel.cpp
+    )
+    qt_add_resources(tst_emoji_model emoji_model_test_data
+        PREFIX /data
+        FILES resources/emoji/emoji-test.txt resources/emoji/cldr-en-48.2.tsv
+    )
+    target_include_directories(tst_emoji_model PRIVATE src)
+    target_link_libraries(tst_emoji_model PRIVATE Qt6::Qml Qt6::Test)
+    add_test(NAME emoji_model COMMAND tst_emoji_model)
+
     qt_add_executable(tst_app_controller
         tests/integration/tst_app_controller.cpp
         src/app/AppController.cpp
@@ -128,7 +143,7 @@ if(BUILD_TESTING)
     )
     qt_add_resources(tst_app_controller test_emoji_data
         PREFIX /data
-        FILES resources/emoji/emoji-test.txt
+        FILES resources/emoji/emoji-test.txt resources/emoji/cldr-en-48.2.tsv
     )
     target_include_directories(tst_app_controller PRIVATE src)
     target_link_libraries(tst_app_controller PRIVATE Qt6::Quick Qt6::Sql Qt6::Test)
@@ -148,7 +163,8 @@ if(BUILD_TESTING)
             src/models/ClipboardModel.cpp
             src/storage/HistoryStore.cpp)
         qt_add_resources(tst_desktop_integration desktop_test_emoji_data
-            PREFIX /data FILES resources/emoji/emoji-test.txt)
+            PREFIX /data FILES resources/emoji/emoji-test.txt
+                resources/emoji/cldr-en-48.2.tsv)
         target_include_directories(tst_desktop_integration PRIVATE src)
         target_link_libraries(tst_desktop_integration PRIVATE
             Qt6::DBus Qt6::Quick Qt6::Sql Qt6::Test)
@@ -194,7 +210,8 @@ if(BUILD_TESTING)
             src/models/ClipboardModel.cpp
             src/storage/HistoryStore.cpp)
         qt_add_resources(tst_x11_backend x11_test_emoji_data
-            PREFIX /data FILES resources/emoji/emoji-test.txt)
+            PREFIX /data FILES resources/emoji/emoji-test.txt
+                resources/emoji/cldr-en-48.2.tsv)
         target_include_directories(tst_x11_backend PRIVATE src)
         target_compile_definitions(tst_x11_backend PRIVATE
             X11_TEST_TARGET="$<TARGET_FILE:x11_test_target>")

@@ -42,6 +42,21 @@ bool EmojiModel::load(const QString &resourcePath)
         return false;
     }
 
+    struct Annotation { QString name; QString keywords; };
+    QHash<QString, Annotation> annotations;
+    QFile annotationFile(QStringLiteral(":/data/cldr-en-48.2.tsv"));
+    if (annotationFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QTextStream annotationStream(&annotationFile);
+        while (!annotationStream.atEnd()) {
+            const QString line = annotationStream.readLine();
+            if (line.startsWith(QLatin1Char('#')))
+                continue;
+            const QStringList fields = line.split(QLatin1Char('\t'));
+            if (fields.size() == 3)
+                annotations.insert(fields.at(0), { fields.at(1), fields.at(2) });
+        }
+    }
+
     beginResetModel();
     m_catalog.clear();
     m_visible.clear();
@@ -88,8 +103,15 @@ bool EmojiModel::load(const QString &resourcePath)
         if (!match.hasMatch())
             continue;
 
-        const QString name = match.captured(1);
-        Emoji emoji { symbol, name, group, name + QLatin1Char(' ') + group + QLatin1Char(' ') + subgroup };
+        const QString unicodeName = match.captured(1);
+        const auto annotation = annotations.constFind(line.left(separator).simplified());
+        const QString name = annotation != annotations.cend() && !annotation->name.isEmpty()
+            ? annotation->name : unicodeName;
+        QString searchable = unicodeName + QLatin1Char(' ') + name + QLatin1Char(' ')
+                             + group + QLatin1Char(' ') + subgroup;
+        if (annotation != annotations.cend())
+            searchable += QLatin1Char(' ') + annotation->keywords;
+        Emoji emoji { symbol, name, group, std::move(searchable) };
         m_indexBySymbol.insert(symbol, m_catalog.size());
         m_catalog.append(std::move(emoji));
     }
