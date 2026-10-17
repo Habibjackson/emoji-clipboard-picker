@@ -11,6 +11,7 @@
 #include <QDBusPendingReply>
 #include <QGuiApplication>
 #include <QQuickWindow>
+#include <QSettings>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -33,6 +34,30 @@ public:
     bool targetArmed = false;
 };
 
+class ProbeStub final : public QObject
+{
+    Q_OBJECT
+    Q_CLASSINFO("D-Bus Interface", "org.emojikeyboard.ClipboardProbe")
+
+public:
+    QString lastMode;
+    int pasteCount = 0;
+    int cancelCount = 0;
+
+public slots:
+    Q_SCRIPTABLE QString PasteSelection(const QString &mode, QString &shortcut,
+                                        uint &clipboardRevision)
+    {
+        lastMode = mode;
+        ++pasteCount;
+        shortcut = QStringLiteral("Ctrl+V");
+        clipboardRevision = 0;
+        return QStringLiteral("sent");
+    }
+
+    Q_SCRIPTABLE void CancelPaste() { ++cancelCount; }
+};
+
 class DesktopIntegrationTest final : public QObject
 {
     Q_OBJECT
@@ -43,6 +68,7 @@ private slots:
     void copyOnlyFallback();
     void shortcutFailurePersistsAfterCopy();
     void repeatedActivationTogglesAndSwitches();
+    void gnomePasteModeAndCancellation();
 };
 
 void DesktopIntegrationTest::gnomeUnavailableCopiesOnly()
@@ -216,9 +242,56 @@ void DesktopIntegrationTest::repeatedActivationTogglesAndSwitches()
     QVERIFY(!service.IsVisible());
 }
 
+void DesktopIntegrationTest::gnomePasteModeAndCancellation()
+{
+    auto bus = QDBusConnection::sessionBus();
+    QVERIFY(bus.isConnected());
+    ProbeStub probe;
+    QVERIFY(bus.registerObject(QStringLiteral("/org/emojikeyboard/ClipboardProbe"), &probe,
+                               QDBusConnection::ExportScriptableSlots));
+    QVERIFY(bus.registerService(QStringLiteral("org.emojikeyboard.ClipboardProbe")));
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QVERIFY(store.open());
+    QVERIFY(store.addText(QStringLiteral("Saved item")));
+    AppController controller(&store, QStringLiteral("clipboard"));
+    QQuickWindow window;
+    window.setProperty("currentView", QStringLiteral("clipboard"));
+    GnomeBackend backend(&window, &controller);
+    PickerService service(&window, &controller, &backend);
+    QVERIFY(backend.isAvailable());
+
+    controller.setPasteShortcutMode(QStringLiteral("ctrl-shift-v"));
+    QCOMPARE(service.ShowFromShortcut(QStringLiteral("clipboard"), false),
+             uint(QCoreApplication::applicationPid()));
+    controller.copyEntry(store.entries().first().id);
+    QTRY_COMPARE_WITH_TIMEOUT(probe.pasteCount, 1, 3000);
+    QCOMPARE(probe.lastMode, QStringLiteral("ctrl-shift-v"));
+
+    QCOMPARE(service.ShowFromShortcut(QStringLiteral("clipboard"), false),
+             uint(QCoreApplication::applicationPid()));
+    controller.copyEntry(store.entries().first().id);
+    backend.cancel();
+    QTest::qWait(100);
+    QCOMPARE(probe.pasteCount, 1);
+    QTRY_VERIFY_WITH_TIMEOUT(probe.cancelCount > 0, 3000);
+
+    bus.unregisterService(QStringLiteral("org.emojikeyboard.ClipboardProbe"));
+    bus.unregisterObject(QStringLiteral("/org/emojikeyboard/ClipboardProbe"));
+}
+
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
+    QTemporaryDir settingsDirectory;
+    if (!settingsDirectory.isValid())
+        return 1;
+    QCoreApplication::setOrganizationName(QStringLiteral("EmojiKeyboardTests"));
+    QCoreApplication::setApplicationName(QStringLiteral("DesktopIntegration"));
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settingsDirectory.path());
     DesktopIntegrationTest test;
     return QTest::qExec(&test, argc, argv);
 }

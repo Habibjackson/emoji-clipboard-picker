@@ -24,7 +24,9 @@ const INTERFACE_XML = `
     </method>
     <method name="ShowEmoji"/>
     <method name="ShowClipboard"/>
+    <method name="CancelPaste"/>
     <method name="PasteSelection">
+      <arg name="shortcutMode" type="s" direction="in"/>
       <arg name="status" type="s" direction="out"/>
       <arg name="shortcut" type="s" direction="out"/>
       <arg name="clipboardRevision" type="u" direction="out"/>
@@ -118,12 +120,19 @@ export default class EmojiKeyboardExtension extends Extension {
         this._showPicker('ShowClipboard');
     }
 
-    PasteSelectionAsync(_params, invocation) {
+    CancelPaste() {
+        this._pasteGeneration++;
+        this._targetWindow = null;
+        this._openClipboardRevision = null;
+    }
+
+    PasteSelectionAsync([shortcutMode], invocation) {
         const target = this._targetWindow;
         this._targetWindow = null;
         const generation = ++this._pasteGeneration;
-        const clipboardRevision = this._openClipboardRevision !== null
-            && this._clipboardRevision === this._openClipboardRevision + 1
+        const openClipboardRevision = this._openClipboardRevision;
+        const clipboardRevision = openClipboardRevision !== null
+            && this._clipboardRevision === openClipboardRevision + 1
             ? this._clipboardRevision : 0;
         this._openClipboardRevision = null;
         const finish = (status, shortcut = '') => {
@@ -137,8 +146,14 @@ export default class EmojiKeyboardExtension extends Extension {
             return;
         }
 
+        if (openClipboardRevision !== null
+            && this._clipboardRevision > openClipboardRevision + 1) {
+            finish('clipboard-changed');
+            return;
+        }
+
         const shortcut = pasteShortcutFor(target.get_gtk_application_id(),
-            target.get_wm_class());
+            target.get_wm_class(), shortcutMode);
         try {
             target.activate(global.get_current_time());
         } catch (error) {

@@ -3,9 +3,11 @@
 #include "storage/HistoryStore.h"
 
 #include <QFile>
+#include <QClipboard>
 #include <QGuiApplication>
 #include <QProcess>
 #include <QQuickWindow>
+#include <QSettings>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
@@ -20,6 +22,7 @@ class X11BackendTest final : public QObject
 
 private slots:
     void clipboardShortcutsAndPaste();
+    void restoresEmojiClipboardAndCancelsSafely();
 };
 
 namespace {
@@ -129,9 +132,23 @@ void X11BackendTest::clipboardShortcutsAndPaste()
         }
     }
     QVERIFY(textId);
+    QVERIFY(store.setPinned(textId, true));
+    qint64 previousUse = 0;
+    for (const auto &entry : store.entries()) {
+        if (entry.id == textId)
+            previousUse = entry.usedAt;
+    }
+    QVERIFY(previousUse);
+    QTest::qWait(5);
     controller.copyEntry(textId);
     QTRY_COMPARE_WITH_TIMEOUT(pasteSpy.size(), 2, 3000);
     QTRY_COMPARE_WITH_TIMEOUT(pastedText(resultPath), QStringLiteral("X11 source text"), 3000);
+    for (const auto &entry : store.entries()) {
+        if (entry.id == textId) {
+            QVERIFY(entry.pinned);
+            QVERIFY(entry.usedAt > previousUse);
+        }
+    }
 
     sendShortcut(display, XK_v);
     QTRY_COMPARE_WITH_TIMEOUT(shortcutSpy.size(), 5, 3000);
@@ -176,19 +193,131 @@ void X11BackendTest::clipboardShortcutsAndPaste()
     QCOMPARE(pasteSpy.at(3).at(0).toString(), QStringLiteral("Ctrl+Shift+V"));
     QTRY_COMPARE_WITH_TIMEOUT(pastedText(resultPath), QStringLiteral("🧪"), 3000);
 
+    controller.setPasteShortcutMode(QStringLiteral("ctrl-v"));
     sendShortcut(display, XK_period);
     QTRY_COMPARE_WITH_TIMEOUT(shortcutSpy.size(), 9, 3000);
+    controller.copyEmoji(QStringLiteral("👀"));
+    QTRY_COMPARE_WITH_TIMEOUT(pasteSpy.size(), 5, 3000);
+    QCOMPARE(pasteSpy.at(4).at(0).toString(), QStringLiteral("Ctrl+V"));
+    QCOMPARE(pastedText(resultPath), QStringLiteral("🧪"));
+    controller.setPasteShortcutMode(QStringLiteral("auto"));
+
+    sendShortcut(display, XK_period);
+    QTRY_COMPARE_WITH_TIMEOUT(shortcutSpy.size(), 10, 3000);
     target.terminate();
     QVERIFY(target.waitForFinished(3000));
     controller.copyEmoji(QStringLiteral("🥑"));
     QTRY_VERIFY_WITH_TIMEOUT(controller.status().contains(QStringLiteral("Target window is gone")), 3000);
+    QCOMPARE(pasteSpy.size(), 5);
+    QCOMPARE(QGuiApplication::clipboard()->text(), QStringLiteral("🥑"));
+    XCloseDisplay(display);
+}
+
+void X11BackendTest::restoresEmojiClipboardAndCancelsSafely()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QVERIFY(store.open());
+    QGuiApplication::clipboard()->clear();
+    AppController controller(&store, QStringLiteral("emoji"));
+    QQuickWindow picker;
+    picker.setProperty("currentView", QStringLiteral("emoji"));
+    picker.resize(400, 300);
+    X11Backend backend(&picker, &controller);
+    QVERIFY2(backend.isAvailable(), qPrintable(backend.errorString()));
+    QSignalSpy pasteSpy(&backend, &X11Backend::pasteSent);
+    QSignalSpy shortcutSpy(&backend, &X11Backend::shortcutTriggered);
+    Display *display = XOpenDisplay(nullptr);
+    QVERIFY(display);
+    const QString resultPath = directory.filePath(QStringLiteral("paste-result"));
+    QProcess target;
+    target.start(QStringLiteral(X11_TEST_TARGET), {resultPath});
+    QVERIFY(target.waitForStarted());
+    QVERIFY(target.waitForReadyRead(3000));
+    const QByteArray ready = target.readLine();
+    QVERIFY2(ready.startsWith("READY "), ready.constData());
+    const Window targetWindow = ready.mid(6).trimmed().toULong();
+    QVERIFY(targetWindow);
+    QTRY_COMPARE_WITH_TIMEOUT(QGuiApplication::clipboard()->image().size(), QSize(2, 2), 3000);
+
+    sendShortcut(display, XK_period);
+    QTRY_COMPARE_WITH_TIMEOUT(shortcutSpy.size(), 1, 3000);
+    controller.copyEmoji(QStringLiteral("😀"));
+    QTRY_COMPARE_WITH_TIMEOUT(pasteSpy.size(), 1, 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(pastedText(resultPath), QStringLiteral("😀"), 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(QGuiApplication::clipboard()->image().size(), QSize(2, 2), 3000);
+    QVERIFY(controller.status().contains(QStringLiteral("Previous clipboard restored")));
+
+    QGuiApplication::clipboard()->setText(QStringLiteral("prior text"));
+    sendShortcut(display, XK_period);
+    QTRY_COMPARE_WITH_TIMEOUT(shortcutSpy.size(), 2, 3000);
+    controller.copyEmoji(QStringLiteral("🧪"));
+    QTRY_COMPARE_WITH_TIMEOUT(pasteSpy.size(), 2, 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(pastedText(resultPath), QStringLiteral("🧪"), 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(QGuiApplication::clipboard()->text(), QStringLiteral("prior text"),
+                              3000);
+    QVERIFY(controller.status().contains(QStringLiteral("Previous clipboard restored")));
+
+    sendShortcut(display, XK_period);
+    QTRY_COMPARE_WITH_TIMEOUT(shortcutSpy.size(), 3, 3000);
+    controller.copyEmoji(QStringLiteral("🪁"));
+    QTRY_COMPARE_WITH_TIMEOUT(pasteSpy.size(), 3, 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(pastedText(resultPath), QStringLiteral("🪁"), 3000);
+    QGuiApplication::clipboard()->setText(QStringLiteral("newer user copy"));
+    QTRY_VERIFY_WITH_TIMEOUT(controller.status().contains(QStringLiteral("newer clipboard copy")),
+                             3000);
+    QCOMPARE(QGuiApplication::clipboard()->text(), QStringLiteral("newer user copy"));
+
+    sendShortcut(display, XK_period);
+    QTRY_COMPARE_WITH_TIMEOUT(shortcutSpy.size(), 4, 3000);
+    controller.copyEmoji(QStringLiteral("🪁"));
+    QTRY_COMPARE_WITH_TIMEOUT(pasteSpy.size(), 4, 3000);
+    const quint64 priorEvents = backend.clipboardEventCount();
+    QGuiApplication::clipboard()->setText(QStringLiteral("🪁"));
+    QTRY_VERIFY_WITH_TIMEOUT(backend.clipboardEventCount() > priorEvents, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(controller.status().contains(QStringLiteral("newer clipboard copy")),
+                             3000);
+    QCOMPARE(QGuiApplication::clipboard()->text(), QStringLiteral("🪁"));
+
+    sendShortcut(display, XK_period);
+    QTRY_COMPARE_WITH_TIMEOUT(shortcutSpy.size(), 5, 3000);
+    controller.copyEmoji(QStringLiteral("🐱"));
+    backend.cancel();
+    QTest::qWait(100);
     QCOMPARE(pasteSpy.size(), 4);
+    QCOMPARE(pastedText(resultPath), QStringLiteral("🪁"));
+    QCOMPARE(QGuiApplication::clipboard()->text(), QStringLiteral("🐱"));
+    Window focused = None;
+    int revert = 0;
+    XGetInputFocus(display, &focused, &revert);
+    QCOMPARE(focused, Window(picker.winId()));
+
+    picker.hide();
+    XSetInputFocus(display, targetWindow, RevertToPointerRoot, CurrentTime);
+    XFlush(display);
+    sendShortcut(display, XK_period);
+    QTRY_COMPARE_WITH_TIMEOUT(shortcutSpy.size(), 6, 3000);
+    target.terminate();
+    QVERIFY(target.waitForFinished(3000));
+    controller.copyEmoji(QStringLiteral("🥑"));
+    QTRY_VERIFY_WITH_TIMEOUT(controller.status().contains(QStringLiteral("Target window is gone")),
+                             3000);
+    QCOMPARE(pasteSpy.size(), 4);
+    QCOMPARE(QGuiApplication::clipboard()->text(), QStringLiteral("🥑"));
     XCloseDisplay(display);
 }
 
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
+    QTemporaryDir settingsDirectory;
+    if (!settingsDirectory.isValid())
+        return 1;
+    QCoreApplication::setOrganizationName(QStringLiteral("EmojiKeyboardTests"));
+    QCoreApplication::setApplicationName(QStringLiteral("X11Backend"));
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settingsDirectory.path());
     X11BackendTest test;
     return QTest::qExec(&test, argc, argv);
 }

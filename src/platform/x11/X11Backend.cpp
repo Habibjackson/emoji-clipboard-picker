@@ -3,6 +3,10 @@
 #include "app/AppController.h"
 
 #include <QQuickWindow>
+#include <QClipboard>
+#include <QElapsedTimer>
+#include <QGuiApplication>
+#include <QImage>
 #include <QSocketNotifier>
 #include <QTimer>
 
@@ -43,9 +47,37 @@ bool checkedXRequest(Display *display, Function function)
     return trappedError == 0;
 }
 
+unsigned long singleProperty(Display *display, Window window, const char *name,
+                             Atom expectedType)
+{
+    const Atom property = XInternAtom(display, name, True);
+    if (property == None)
+        return 0;
+    Atom actualType = None;
+    int format = 0;
+    unsigned long count = 0;
+    unsigned long remaining = 0;
+    unsigned char *data = nullptr;
+    int result = BadValue;
+    const bool noError = checkedXRequest(display, [&] {
+        result = XGetWindowProperty(display, window, property, 0, 1, False,
+                                    expectedType, &actualType, &format, &count,
+                                    &remaining, &data);
+    });
+    unsigned long value = 0;
+    if (noError && result == Success && actualType == expectedType
+        && format == 32 && count == 1 && data)
+        value = *reinterpret_cast<unsigned long *>(data);
+    if (data)
+        XFree(data);
+    return value;
+}
+
 constexpr std::array terminalClasses = {
-    "alacritty", "foot", "gnome-terminal", "kitty", "konsole",
-    "org.gnome.console", "org.gnome.ptyxis", "terminator", "tilix",
+    "alacritty", "com.mitchellh.ghostty", "foot", "gnome-terminal",
+    "io.elementary.terminal", "kitty", "konsole", "org.gnome.console",
+    "org.gnome.ptyxis", "org.gnome.terminal", "org.wezfurlong.wezterm",
+    "ptyxis", "terminator", "tilix",
 };
 }
 
@@ -69,9 +101,9 @@ X11Backend::X11Backend(QQuickWindow *window, AppController *controller, QObject 
     }
 
     m_root = DefaultRootWindow(m_display);
-    const Atom clipboard = XInternAtom(m_display, "CLIPBOARD", False);
-    if (!checkedXRequest(m_display, [this, clipboard] {
-            XFixesSelectSelectionInput(m_display, m_root, clipboard,
+    m_clipboardSelection = XInternAtom(m_display, "CLIPBOARD", False);
+    if (!checkedXRequest(m_display, [this] {
+            XFixesSelectSelectionInput(m_display, m_root, m_clipboardSelection,
                                        XFixesSetSelectionOwnerNotifyMask);
         })) {
         m_error = tr("Could not watch the X11 clipboard");
@@ -103,17 +135,25 @@ X11Backend::X11Backend(QQuickWindow *window, AppController *controller, QObject 
     });
     connect(m_controller, &AppController::itemCopied, this, [this] {
         if (!m_shortcutArmed) {
+            if (m_pastePending)
+                cancel();
             if (m_controller)
                 m_controller->discardEmojiClipboardSnapshot();
             return;
         }
         m_shortcutArmed = false;
         m_pastePending = true;
+        XSync(m_display, False);
+        processEvents();
+        m_selectedClipboardOwner = XGetSelectionOwner(m_display, m_clipboardSelection);
+        m_selectedClipboardRevision = m_clipboardEvents;
+        const quint64 pasteGeneration = ++m_pasteGeneration;
         const bool emoji = m_controller && m_controller->hasEmojiClipboardSnapshot();
         const quint64 generation = m_controller
             ? m_controller->emojiClipboardSnapshotGeneration() : 0;
-        QTimer::singleShot(0, this, [this, emoji, generation] {
-            pasteSelection(emoji, generation);
+        QTimer::singleShot(0, this, [this, emoji, generation, pasteGeneration] {
+            if (pasteGeneration == m_pasteGeneration)
+                pasteSelection(emoji, generation);
         });
     });
     XFlush(m_display);
@@ -149,6 +189,15 @@ quint64 X11Backend::clipboardEventCount() const
 
 void X11Backend::cancel()
 {
+    ++m_pasteGeneration;
+    if (m_focusTimer) {
+        m_focusTimer->stop();
+        m_focusTimer->deleteLater();
+        m_focusTimer = nullptr;
+    }
+    if (m_pastePending && m_controller)
+        m_controller->discardEmojiClipboardSnapshot();
+    m_pastePending = false;
     m_shortcutArmed = false;
     m_target = None;
 }
@@ -169,6 +218,7 @@ void X11Backend::processEvents()
             emit clipboardOwnerChanged();
             captureClipboard(QString());
         } else if (event.type == KeyPress && (event.xkey.state & Mod4Mask)) {
+            m_lastShortcutTime = event.xkey.time;
             if (m_emojiGrabbed && event.xkey.keycode == m_emojiKeycode) {
                 activateShortcutView(QStringLiteral("emoji"));
             } else if (m_clipboardGrabbed && event.xkey.keycode == m_clipboardKeycode) {
@@ -193,6 +243,7 @@ void X11Backend::activateShortcutView(const QString &view)
             openView(view);
         }
     } else {
+        cancel();
         rememberTarget();
         openView(view);
     }
@@ -206,8 +257,12 @@ bool X11Backend::rememberTarget()
     Window focused = None;
     int revert = 0;
     XGetInputFocus(m_display, &focused, &revert);
-    m_target = focused == Window(m_window->winId()) || focused == PointerRoot
-        || focused == m_root ? None : focused;
+    const bool pickerFocused = focused == Window(m_window->winId());
+    const Window active = hasEwmhWindowManager()
+        ? singleProperty(m_display, m_root, "_NET_ACTIVE_WINDOW", XA_WINDOW) : None;
+    m_target = pickerFocused || focused == PointerRoot || focused == m_root
+        ? None : active && active != Window(m_window->winId()) && windowExists(active)
+            ? active : focused;
     m_shortcutArmed = true;
     return m_target != None;
 }
@@ -219,31 +274,123 @@ void X11Backend::openView(const QString &view)
 
 void X11Backend::pasteSelection(bool, quint64 snapshotGeneration)
 {
-    m_pastePending = false;
     const Window target = std::exchange(m_target, None);
     if (m_controller && m_controller->emojiClipboardSnapshotGeneration()
         != snapshotGeneration) {
+        m_pastePending = false;
         return;
     }
-    if (m_controller)
-        m_controller->discardEmojiClipboardSnapshot();
     if (!m_controller || !target || !windowExists(target)) {
+        m_pastePending = false;
+        if (m_controller)
+            m_controller->discardEmojiClipboardSnapshot();
         reportFailure(QStringLiteral("target-missing"));
         return;
     }
-    const bool terminal = targetIsTerminal(target);
+    const QString shortcut = m_controller->pasteShortcutFor(targetIsTerminal(target));
+    if (!hasEwmhWindowManager()) {
+        if (!checkedXRequest(m_display, [this, target] {
+                XRaiseWindow(m_display, target);
+                XSetInputFocus(m_display, target, RevertToPointerRoot, CurrentTime);
+            })) {
+            m_pastePending = false;
+            m_controller->discardEmojiClipboardSnapshot();
+            reportFailure(QStringLiteral("focus-failed"));
+            return;
+        }
+    } else {
+        const Atom activeWindow = XInternAtom(m_display, "_NET_ACTIVE_WINDOW", False);
+        XEvent request{};
+        request.xclient.type = ClientMessage;
+        request.xclient.window = target;
+        request.xclient.message_type = activeWindow;
+        request.xclient.format = 32;
+        request.xclient.data.l[0] = 1;
+        const unsigned long userTime = m_window
+            ? singleProperty(m_display, Window(m_window->winId()),
+                             "_NET_WM_USER_TIME", XA_CARDINAL) : 0;
+        request.xclient.data.l[1] = long(userTime ? userTime : m_lastShortcutTime);
+        request.xclient.data.l[2] = m_window ? long(m_window->winId()) : 0;
+        if (!checkedXRequest(m_display, [this, &request] {
+                XSendEvent(m_display, m_root, False,
+                           SubstructureRedirectMask | SubstructureNotifyMask, &request);
+            })) {
+            m_pastePending = false;
+            m_controller->discardEmojiClipboardSnapshot();
+            reportFailure(QStringLiteral("focus-failed"));
+            return;
+        }
+    }
+
+    QElapsedTimer started;
+    started.start();
+    const quint64 pasteGeneration = m_pasteGeneration;
+    auto *timer = new QTimer(this);
+    m_focusTimer = timer;
+    timer->setInterval(25);
+    connect(timer, &QTimer::timeout, this,
+            [this, timer, target, emoji = m_controller->hasEmojiClipboardSnapshot(),
+             snapshotGeneration, shortcut, started, pasteGeneration] {
+        if (pasteGeneration != m_pasteGeneration) {
+            timer->stop();
+            timer->deleteLater();
+            return;
+        }
+        if (!windowExists(target)) {
+            timer->stop();
+            timer->deleteLater();
+            m_focusTimer = nullptr;
+            m_pastePending = false;
+            m_controller->discardEmojiClipboardSnapshot();
+            reportFailure(QStringLiteral("target-missing"));
+            return;
+        }
+        if (targetHasFocus(target)) {
+            timer->stop();
+            timer->deleteLater();
+            m_focusTimer = nullptr;
+            m_pastePending = false;
+            sendPaste(target, emoji, snapshotGeneration, shortcut);
+        } else if (started.elapsed() >= 750) {
+            timer->stop();
+            timer->deleteLater();
+            m_focusTimer = nullptr;
+            m_pastePending = false;
+            m_controller->discardEmojiClipboardSnapshot();
+            reportFailure(QStringLiteral("focus-failed"));
+        }
+    });
+    timer->start();
+}
+
+void X11Backend::sendPaste(unsigned long target, bool emoji, quint64 snapshotGeneration,
+                           const QString &shortcut)
+{
+    if (!m_controller || m_controller->emojiClipboardSnapshotGeneration()
+        != snapshotGeneration)
+        return;
+    XSync(m_display, False);
+    processEvents();
+    if (!QGuiApplication::clipboard()->ownsClipboard()
+        || !m_selectedClipboardOwner
+        || XGetSelectionOwner(m_display, m_clipboardSelection) != m_selectedClipboardOwner
+        || m_clipboardEvents != m_selectedClipboardRevision) {
+        m_controller->discardEmojiClipboardSnapshot();
+        reportFailure(QStringLiteral("clipboard-changed"));
+        return;
+    }
+    if (!targetHasFocus(target)) {
+        m_controller->discardEmojiClipboardSnapshot();
+        reportFailure(QStringLiteral("focus-failed"));
+        return;
+    }
+    const bool terminal = shortcut == QStringLiteral("Ctrl+Shift+V");
     const auto control = XKeysymToKeycode(m_display, XK_Control_L);
     const auto shift = XKeysymToKeycode(m_display, XK_Shift_L);
     const auto v = XKeysymToKeycode(m_display, XK_v);
     if (!control || !v || (terminal && !shift)) {
+        m_controller->discardEmojiClipboardSnapshot();
         reportFailure(QStringLiteral("input-failed"));
-        return;
-    }
-    if (!checkedXRequest(m_display, [this, target] {
-            XRaiseWindow(m_display, target);
-            XSetInputFocus(m_display, target, RevertToPointerRoot, CurrentTime);
-        })) {
-        reportFailure(QStringLiteral("focus-failed"));
         return;
     }
     bool sent = XTestFakeKeyEvent(m_display, control, True, CurrentTime);
@@ -255,13 +402,76 @@ void X11Backend::pasteSelection(bool, quint64 snapshotGeneration)
         sent = XTestFakeKeyEvent(m_display, shift, False, CurrentTime) && sent;
     sent = XTestFakeKeyEvent(m_display, control, False, CurrentTime) && sent;
     if (!sent) {
+        m_controller->discardEmojiClipboardSnapshot();
         reportFailure(QStringLiteral("input-failed"));
         return;
     }
     XFlush(m_display);
-    const QString shortcut = terminal ? QStringLiteral("Ctrl+Shift+V") : QStringLiteral("Ctrl+V");
     m_controller->reportPasteResult(QStringLiteral("sent"), shortcut);
     emit pasteSent(shortcut);
+    if (!emoji) {
+        m_controller->discardEmojiClipboardSnapshot();
+        return;
+    }
+    XSync(m_display, False);
+    processEvents();
+    if (m_controller->emojiClipboardSnapshotGeneration() != snapshotGeneration)
+        return;
+    const Window owner = XGetSelectionOwner(m_display, m_clipboardSelection);
+    const quint64 revision = m_clipboardEvents;
+    QTimer::singleShot(750, this, [this, snapshotGeneration, owner, revision] {
+        restoreClipboard(snapshotGeneration, owner, revision);
+    });
+}
+
+void X11Backend::restoreClipboard(quint64 snapshotGeneration, unsigned long temporaryOwner,
+                                  quint64 clipboardRevision)
+{
+    if (!m_controller || m_controller->emojiClipboardSnapshotGeneration()
+        != snapshotGeneration)
+        return;
+    XSync(m_display, False);
+    processEvents();
+    QString temporaryText;
+    QString mimeType;
+    QByteArray content;
+    const bool snapshotAvailable = m_controller->emojiClipboardSnapshot(
+        &temporaryText, &mimeType, &content);
+    if (!snapshotAvailable) {
+        m_controller->discardEmojiClipboardSnapshot();
+        m_controller->reportClipboardRestoreResult(
+            AppController::ClipboardRestoreResult::Unavailable);
+        return;
+    }
+    if (!temporaryOwner || m_clipboardEvents != clipboardRevision
+        || XGetSelectionOwner(m_display, m_clipboardSelection) != temporaryOwner
+        || QGuiApplication::clipboard()->text() != temporaryText) {
+        m_controller->discardEmojiClipboardSnapshot();
+        m_controller->reportClipboardRestoreResult(
+            AppController::ClipboardRestoreResult::Changed);
+        return;
+    }
+    m_controller->expectClipboardRestore(mimeType, content);
+    if (mimeType == QStringLiteral("image/png")) {
+        const QImage image = QImage::fromData(content, "PNG");
+        if (image.isNull()) {
+            m_controller->discardEmojiClipboardSnapshot();
+            m_controller->reportClipboardRestoreResult(
+                AppController::ClipboardRestoreResult::Unavailable);
+            return;
+        }
+        QGuiApplication::clipboard()->setImage(image);
+    } else if (mimeType == QStringLiteral("text/plain;charset=utf-8")) {
+        QGuiApplication::clipboard()->setText(QString::fromUtf8(content));
+    } else {
+        m_controller->discardEmojiClipboardSnapshot();
+        m_controller->reportClipboardRestoreResult(
+            AppController::ClipboardRestoreResult::Unavailable);
+        return;
+    }
+    m_controller->discardEmojiClipboardSnapshot();
+    m_controller->reportClipboardRestoreResult(
+        AppController::ClipboardRestoreResult::Restored);
 }
 
 bool X11Backend::grabShortcut(unsigned int keycode)
@@ -297,6 +507,40 @@ bool X11Backend::windowExists(unsigned long window) const
         found = XGetWindowAttributes(m_display, window, &attributes);
     });
     return noError && found;
+}
+
+bool X11Backend::targetHasFocus(unsigned long target) const
+{
+    Window focused = None;
+    int revert = 0;
+    XGetInputFocus(m_display, &focused, &revert);
+    while (focused != None && focused != PointerRoot && focused != m_root) {
+        if (focused == target)
+            return true;
+        Window root = None;
+        Window parent = None;
+        Window *children = nullptr;
+        unsigned int count = 0;
+        int found = 0;
+        const bool noError = checkedXRequest(m_display, [&] {
+            found = XQueryTree(m_display, focused, &root, &parent, &children, &count);
+        });
+        if (children)
+            XFree(children);
+        if (!noError || !found || parent == focused)
+            break;
+        focused = parent;
+    }
+    return false;
+}
+
+bool X11Backend::hasEwmhWindowManager() const
+{
+    const Window manager = singleProperty(m_display, m_root,
+                                          "_NET_SUPPORTING_WM_CHECK", XA_WINDOW);
+    return manager != None && windowExists(manager)
+        && singleProperty(m_display, manager, "_NET_SUPPORTING_WM_CHECK", XA_WINDOW)
+            == manager;
 }
 
 bool X11Backend::targetIsTerminal(unsigned long window) const

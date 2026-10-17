@@ -20,6 +20,8 @@ class AppController : public QObject
     Q_PROPERTY(EmojiModel *emojiModel READ emojiModel CONSTANT)
     Q_PROPERTY(ClipboardModel *clipboardModel READ clipboardModel CONSTANT)
     Q_PROPERTY(bool paused READ paused WRITE setPaused NOTIFY pausedChanged)
+    Q_PROPERTY(QString pasteShortcutMode READ pasteShortcutMode WRITE setPasteShortcutMode
+                   NOTIFY pasteShortcutModeChanged)
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(QString attention READ attention NOTIFY attentionChanged)
     Q_PROPERTY(QString integrationWarning READ integrationWarning NOTIFY integrationWarningChanged)
@@ -36,6 +38,9 @@ public:
     ClipboardModel *clipboardModel();
     bool paused() const;
     void setPaused(bool paused);
+    QString pasteShortcutMode() const;
+    void setPasteShortcutMode(const QString &mode);
+    QString pasteShortcutFor(bool terminal) const;
     QString status() const;
     QString attention() const;
     QString integrationWarning() const;
@@ -64,6 +69,7 @@ public:
 signals:
     void itemCopied();
     void pausedChanged();
+    void pasteShortcutModeChanged();
     void statusChanged();
     void attentionChanged();
     void integrationWarningChanged();
@@ -99,4 +105,5 @@ private:
     QString m_temporaryEmoji;
     quint64 m_snapshotGeneration = 0;
     bool m_paused = false;
+    QString m_pasteShortcutMode;
 };

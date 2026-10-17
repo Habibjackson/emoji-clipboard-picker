@@ -12,6 +12,7 @@
 #include <QLoggingCategory>
 #include <QMimeData>
 #include <QSet>
+#include <QSettings>
 #include <QTimer>
 
 #include <atomic>
@@ -189,6 +190,10 @@ AppController::AppController(HistoryStore *store, QString initialView, QObject *
     , m_clipboardModel(store, this)
     , m_initialView(std::move(initialView))
 {
+    const QString savedMode = QSettings().value(QStringLiteral("pasteShortcutMode"),
+                                                QStringLiteral("auto")).toString();
+    m_pasteShortcutMode = savedMode == QStringLiteral("ctrl-v")
+            || savedMode == QStringLiteral("ctrl-shift-v") ? savedMode : QStringLiteral("auto");
     protectClipboardDecoderLogs();
     if (!m_emojiModel.load(QStringLiteral(":/data/emoji-test.txt")))
         setStatus(tr("Emoji catalog could not be loaded"));
@@ -228,6 +233,31 @@ void AppController::setPaused(bool paused)
     setStatus(paused ? tr("Clipboard capture paused") : tr("Clipboard capture resumed"));
     if (!paused)
         captureCurrentClipboard();
+}
+
+QString AppController::pasteShortcutMode() const
+{
+    return m_pasteShortcutMode;
+}
+
+void AppController::setPasteShortcutMode(const QString &mode)
+{
+    if (mode != QStringLiteral("auto") && mode != QStringLiteral("ctrl-v")
+        && mode != QStringLiteral("ctrl-shift-v"))
+        return;
+    if (m_pasteShortcutMode == mode)
+        return;
+    m_pasteShortcutMode = mode;
+    QSettings().setValue(QStringLiteral("pasteShortcutMode"), mode);
+    emit pasteShortcutModeChanged();
+}
+
+QString AppController::pasteShortcutFor(bool terminal) const
+{
+    if (m_pasteShortcutMode == QStringLiteral("ctrl-shift-v")
+        || (m_pasteShortcutMode == QStringLiteral("auto") && terminal))
+        return QStringLiteral("Ctrl+Shift+V");
+    return QStringLiteral("Ctrl+V");
 }
 
 QString AppController::status() const
@@ -361,6 +391,10 @@ void AppController::reportPasteResult(const QString &result, const QString &shor
         setStatus(tr("Target window is gone. Item copied; paste manually."));
     } else if (result == QStringLiteral("focus-failed")) {
         setStatus(tr("Could not focus the target. Item copied; paste manually."));
+    } else if (result == QStringLiteral("clipboard-changed")) {
+        setStatus(tr("Clipboard changed before paste. Paste manually if needed."));
+    } else if (result == QStringLiteral("cancelled")) {
+        setStatus(tr("Paste cancelled. Item copied; paste manually."));
     } else {
         setStatus(tr("Automatic paste unavailable. Item copied; paste manually."));
     }

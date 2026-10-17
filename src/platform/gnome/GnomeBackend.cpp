@@ -9,6 +9,7 @@
 #include <QDBusPendingReply>
 #include <QDBusReply>
 #include <QDBusServiceWatcher>
+#include <QQuickWindow>
 #include <QTimer>
 
 GnomeBackend::GnomeBackend(QQuickWindow *window, AppController *controller, QObject *parent)
@@ -20,18 +21,33 @@ GnomeBackend::GnomeBackend(QQuickWindow *window, AppController *controller, QObj
     connect(watcher, &QDBusServiceWatcher::serviceOwnerChanged,
             this, [this] { emit availabilityChanged(); });
 
+    connect(m_window, &QWindow::visibleChanged, this, [this](bool visible) {
+        if (!visible) {
+            QTimer::singleShot(0, this, [this] {
+                if (!m_pastePending && m_window && !m_window->isVisible())
+                    cancel();
+            });
+        }
+    });
+
     connect(m_controller, &AppController::itemCopied, this, [this] {
         if (!m_shortcutTargetArmed) {
+            if (m_pastePending)
+                cancel();
             if (m_controller)
                 m_controller->discardEmojiClipboardSnapshot();
             return;
         }
         m_shortcutTargetArmed = false;
+        m_pastePending = true;
+        m_pasteDispatched = false;
+        const quint64 pasteGeneration = ++m_pasteGeneration;
         const bool emoji = m_controller && m_controller->hasEmojiClipboardSnapshot();
         const quint64 generation = m_controller
             ? m_controller->emojiClipboardSnapshotGeneration() : 0;
-        QTimer::singleShot(0, this, [this, emoji, generation] {
-            pasteSelection(emoji, generation);
+        QTimer::singleShot(0, this, [this, emoji, generation, pasteGeneration] {
+            if (pasteGeneration == m_pasteGeneration)
+                pasteSelection(emoji, generation);
         });
     });
 }
@@ -78,17 +94,32 @@ bool GnomeBackend::rememberTarget()
 
 void GnomeBackend::cancel()
 {
+    ++m_pasteGeneration;
+    if (m_pastePending && !m_pasteDispatched && m_controller)
+        m_controller->discardEmojiClipboardSnapshot();
+    m_pastePending = false;
+    m_pasteDispatched = false;
     m_shortcutTargetArmed = false;
+    const auto bus = QDBusConnection::sessionBus();
+    if (bus.isConnected()) {
+        const auto message = QDBusMessage::createMethodCall(
+            QStringLiteral("org.emojikeyboard.ClipboardProbe"),
+            QStringLiteral("/org/emojikeyboard/ClipboardProbe"),
+            QStringLiteral("org.emojikeyboard.ClipboardProbe"), QStringLiteral("CancelPaste"));
+        bus.asyncCall(message);
+    }
 }
 
 void GnomeBackend::pasteSelection(bool emoji, quint64 snapshotGeneration)
 {
     if (!m_controller || m_controller->emojiClipboardSnapshotGeneration()
         != snapshotGeneration) {
+        m_pastePending = false;
         return;
     }
     const auto bus = QDBusConnection::sessionBus();
     if (!bus.isConnected()) {
+        m_pastePending = false;
         m_controller->discardEmojiClipboardSnapshot();
         reportFailure(QStringLiteral("bridge-unavailable"));
         return;
@@ -97,9 +128,16 @@ void GnomeBackend::pasteSelection(bool emoji, quint64 snapshotGeneration)
         QStringLiteral("org.emojikeyboard.ClipboardProbe"),
         QStringLiteral("/org/emojikeyboard/ClipboardProbe"),
         QStringLiteral("org.emojikeyboard.ClipboardProbe"), QStringLiteral("PasteSelection"));
+    message.setArguments({m_controller->pasteShortcutMode()});
+    m_pasteDispatched = true;
+    const quint64 pasteGeneration = m_pasteGeneration;
     auto *watcher = new QDBusPendingCallWatcher(bus.asyncCall(message), this);
     connect(watcher, &QDBusPendingCallWatcher::finished,
-            this, [this, watcher, emoji, snapshotGeneration] {
+            this, [this, watcher, emoji, snapshotGeneration, pasteGeneration] {
+        if (pasteGeneration == m_pasteGeneration) {
+            m_pastePending = false;
+            m_pasteDispatched = false;
+        }
         const QDBusPendingReply<QString, QString, uint> reply = *watcher;
         if (m_controller && m_controller->emojiClipboardSnapshotGeneration()
             == snapshotGeneration) {

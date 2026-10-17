@@ -21,4 +21,7 @@ private:
     void restoreClipboard(quint64 snapshotGeneration, uint clipboardRevision);
 
     bool m_shortcutTargetArmed = false;
+    bool m_pastePending = false;
+    bool m_pasteDispatched = false;
+    quint64 m_pasteGeneration = 0;
 };

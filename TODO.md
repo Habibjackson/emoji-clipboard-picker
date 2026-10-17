@@ -62,12 +62,12 @@
 
 ## 6. Finish Wayland and X11 paste flows
 
-- [ ] On GNOME Wayland, let the extension capture the target window when a shortcut fires, then activate the Qt picker. The Qt app sends the selected text/image to the extension for focus restoration and paste.
-- [ ] On X11, capture the active window before showing the picker, then hide the picker, restore the target through the window manager, and synthesize paste using XTest.
-- [ ] Use `Ctrl+V` for ordinary applications and `Ctrl+Shift+V` for recognized terminals; provide a setting to override the paste shortcut when detection is wrong.
-- [ ] For a clipboard-history selection, make the selected item the current clipboard content and paste it. Update its recent position without changing its pin state.
-- [ ] For an emoji selection, temporarily put the emoji on the clipboard, paste, then restore the prior supported text/image content only if the temporary content is still current. If the target disappears or paste fails, leave the emoji copied and tell the user how to paste it manually.
-- [ ] Avoid paste loops, double injection, focus theft after cancellation, and replacing a clipboard change made during the operation.
+- [x] On GNOME Wayland, the extension captures the target when a shortcut fires and activates Qt. Qt puts the selected text/image on the clipboard and asks Shell to restore focus and paste. (GTK entry and terminal behavior passed in the earlier isolated GNOME 50.1 test; the updated D-Bus mode/cancel contract passes an isolated-bus test. Live retest remains in section 8.)
+- [x] On X11, capture the active window before showing the picker, then hide the picker, restore the target through an EWMH window-manager request (direct focus fallback without one), and synthesize paste using XTest. (Xvfb integration test passes.)
+- [x] Use `Ctrl+V` for ordinary applications and `Ctrl+Shift+V` for recognized terminals, with a persistent override in the Clipboard view. (Both X11 and GNOME pass the selected mode to their paste path.)
+- [x] For a clipboard-history selection, make the selected item current and paste it. Touch its recent position without changing its pin state. (Xvfb tests text/image paste and pinned history use.)
+- [x] For an emoji selection, temporarily put it on the clipboard and restore prior supported text/image after paste only while it remains current. If the target disappears or paste fails, leave the emoji copied with a manual-paste message. (Xvfb tests text/image restoration, newer copies, and missing target.)
+- [x] Guard against paste loops, double injection, focus theft after cancellation, and replacing a clipboard change made during the operation. (Generation checks, focus checks, GNOME cancellation, and X11 clipboard-owner/revision checks; Xvfb covers cancellation and same-content newer copies.)
 
 ## 7. Setup, startup, and removal
 

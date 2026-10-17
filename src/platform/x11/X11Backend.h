@@ -8,6 +8,7 @@ struct _XDisplay;
 class AppController;
 class QQuickWindow;
 class QSocketNotifier;
+class QTimer;
 
 class X11Backend : public DesktopIntegration
 {
@@ -38,7 +39,13 @@ private:
     bool grabShortcut(unsigned int keycode);
     void releaseShortcut(unsigned int keycode);
     bool windowExists(unsigned long window) const;
+    bool targetHasFocus(unsigned long target) const;
     bool targetIsTerminal(unsigned long window) const;
+    bool hasEwmhWindowManager() const;
+    void sendPaste(unsigned long target, bool emoji, quint64 snapshotGeneration,
+                   const QString &shortcut);
+    void restoreClipboard(quint64 snapshotGeneration, unsigned long temporaryOwner,
+                          quint64 clipboardRevision);
     unsigned int numLockMask() const;
 
     struct _XDisplay *m_display = nullptr;
@@ -46,6 +53,10 @@ private:
     QString m_error;
     unsigned long m_root = 0;
     unsigned long m_target = 0;
+    unsigned long m_clipboardSelection = 0;
+    unsigned long m_lastShortcutTime = 0;
+    unsigned long m_selectedClipboardOwner = 0;
+    quint64 m_selectedClipboardRevision = 0;
     unsigned int m_emojiKeycode = 0;
     unsigned int m_clipboardKeycode = 0;
     unsigned int m_numLockMask = 0;
@@ -55,4 +66,6 @@ private:
     bool m_clipboardGrabbed = false;
     bool m_shortcutArmed = false;
     bool m_pastePending = false;
+    quint64 m_pasteGeneration = 0;
+    QTimer *m_focusTimer = nullptr;
 };

@@ -15,7 +15,11 @@ const TERMINAL_IDS = new Set([
     'tilix',
 ]);
 
-export function pasteShortcutFor(appId, wmClass) {
+export function pasteShortcutFor(appId, wmClass, mode = 'auto') {
+    if (mode === 'ctrl-v')
+        return 'Ctrl+V';
+    if (mode === 'ctrl-shift-v')
+        return 'Ctrl+Shift+V';
     const identifiers = [appId, wmClass].filter(Boolean)
         .map(identifier => identifier.toLowerCase());
     return identifiers.some(identifier => TERMINAL_IDS.has(identifier))

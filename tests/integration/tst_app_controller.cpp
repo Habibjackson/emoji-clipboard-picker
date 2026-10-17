@@ -6,6 +6,7 @@
 #include <QGuiApplication>
 #include <QImage>
 #include <QMimeData>
+#include <QSettings>
 #include <QTemporaryDir>
 #include <QUrl>
 #include <QtTest>
@@ -24,6 +25,7 @@ private slots:
     void laterCopyOfTemporaryEmojiIsCaptured();
     void newerIdenticalEmojiCopyIsCaptured();
     void snapshotsSupportedClipboardBeforeEmoji();
+    void pasteShortcutOverridePersists();
 };
 
 void AppControllerTest::capturesAndCopies()
@@ -376,6 +378,41 @@ void AppControllerTest::snapshotsSupportedClipboardBeforeEmoji()
     QCOMPARE(temporaryText, QString::fromUtf8("🎉"));
     QCOMPARE(mimeType, QStringLiteral("image/png"));
     QCOMPARE(QImage::fromData(content, "PNG"), image);
+}
+
+void AppControllerTest::pasteShortcutOverridePersists()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString previousOrganization = QCoreApplication::organizationName();
+    const QString previousApplication = QCoreApplication::applicationName();
+    QCoreApplication::setOrganizationName(QStringLiteral("EmojiKeyboardTests"));
+    QCoreApplication::setApplicationName(QStringLiteral("PasteShortcutOverride"));
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, directory.path());
+
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QVERIFY(store.open());
+    {
+        AppController controller(&store, QStringLiteral("emoji"));
+        QCOMPARE(controller.pasteShortcutMode(), QStringLiteral("auto"));
+        QCOMPARE(controller.pasteShortcutFor(false), QStringLiteral("Ctrl+V"));
+        QCOMPARE(controller.pasteShortcutFor(true), QStringLiteral("Ctrl+Shift+V"));
+        QSignalSpy changed(&controller, &AppController::pasteShortcutModeChanged);
+        controller.setPasteShortcutMode(QStringLiteral("ctrl-shift-v"));
+        QCOMPARE(changed.size(), 1);
+        QCOMPARE(controller.pasteShortcutFor(false), QStringLiteral("Ctrl+Shift+V"));
+        controller.setPasteShortcutMode(QStringLiteral("invalid"));
+        QCOMPARE(changed.size(), 1);
+    }
+    {
+        AppController controller(&store, QStringLiteral("emoji"));
+        QCOMPARE(controller.pasteShortcutMode(), QStringLiteral("ctrl-shift-v"));
+        controller.setPasteShortcutMode(QStringLiteral("ctrl-v"));
+        QCOMPARE(controller.pasteShortcutFor(true), QStringLiteral("Ctrl+V"));
+    }
+    QCoreApplication::setOrganizationName(previousOrganization);
+    QCoreApplication::setApplicationName(previousApplication);
 }
 
 QTEST_MAIN(AppControllerTest)

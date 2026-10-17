@@ -180,6 +180,26 @@ T.ApplicationWindow {
                             onClicked: window.controller.paused = !window.controller.paused
                             onActiveFocusChanged: if (activeFocus) clipboardActions.reveal(pauseButton)
                         }
+                        Text {
+                            Layout.fillWidth: true
+                            Layout.topMargin: Theme.fontSize(10)
+                            text: qsTr("PASTE SHORTCUT")
+                            color: Theme.muted
+                            font.family: Theme.bodyFamily
+                            font.pixelSize: Theme.fontSize(10)
+                            font.weight: Font.Bold
+                            font.letterSpacing: 1.3
+                        }
+                        ActionButton {
+                            id: pasteShortcutButton
+                            Layout.fillWidth: true
+                            text: window.controller.pasteShortcutMode === "ctrl-v" ? qsTr("Ctrl+V")
+                                  : window.controller.pasteShortcutMode === "ctrl-shift-v"
+                                    ? qsTr("Ctrl+Shift+V") : qsTr("Auto detect")
+                            accessibilityLabel: qsTr("Paste shortcut: %1. Open choices").arg(text)
+                            onClicked: pasteShortcutPopup.open()
+                            onActiveFocusChanged: if (activeFocus) clipboardActions.reveal(pasteShortcutButton)
+                        }
                         ActionButton {
                             id: clearRecentButton
                             Layout.fillWidth: true
@@ -332,6 +352,62 @@ T.ApplicationWindow {
     Component {
         id: clipboardComponent
         ClipboardView { controller: window.controller }
+    }
+
+    T.Popup {
+        id: pasteShortcutPopup
+        parent: window.contentItem
+        x: Math.min(window.width - width - 12,
+                    pasteShortcutButton.mapToItem(window.contentItem,
+                                                  pasteShortcutButton.width + 8, 0).x)
+        y: Math.max(12, Math.min(window.height - height - 12,
+                                pasteShortcutButton.mapToItem(window.contentItem, 0, 0).y))
+        width: Theme.fontSize(190)
+        padding: Theme.fontSize(8)
+        focus: true
+        closePolicy: T.Popup.CloseOnEscape | T.Popup.CloseOnPressOutside
+        onOpened: autoPasteButton.forceActiveFocus()
+
+        background: Rectangle {
+            radius: Theme.smallRadius
+            color: Theme.surface
+            border.color: Theme.line
+            border.width: 1
+        }
+        contentItem: ColumnLayout {
+            spacing: Theme.fontSize(4)
+            ActionButton {
+                id: autoPasteButton
+                Layout.fillWidth: true
+                text: qsTr("Auto detect")
+                selected: window.controller.pasteShortcutMode === "auto"
+                accessibilityLabel: qsTr("Automatically detect the paste shortcut")
+                onClicked: {
+                    window.controller.pasteShortcutMode = "auto"
+                    pasteShortcutPopup.close()
+                }
+            }
+            ActionButton {
+                Layout.fillWidth: true
+                text: qsTr("Ctrl+V")
+                selected: window.controller.pasteShortcutMode === "ctrl-v"
+                accessibilityLabel: qsTr("Always paste with Ctrl+V")
+                onClicked: {
+                    window.controller.pasteShortcutMode = "ctrl-v"
+                    pasteShortcutPopup.close()
+                }
+            }
+            ActionButton {
+                Layout.fillWidth: true
+                text: qsTr("Ctrl+Shift+V")
+                selected: window.controller.pasteShortcutMode === "ctrl-shift-v"
+                accessibilityLabel: qsTr("Always paste with Ctrl+Shift+V")
+                onClicked: {
+                    window.controller.pasteShortcutMode = "ctrl-shift-v"
+                    pasteShortcutPopup.close()
+                }
+            }
+        }
     }
 
     T.Popup {
