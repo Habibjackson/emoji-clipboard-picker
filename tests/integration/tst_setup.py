@@ -113,6 +113,7 @@ class SetupTests(unittest.TestCase):
             "historyDirectory": str(self.home / "history"),
             "settingsFile": str(self.home / "settings.ini"),
         }), mock.patch.object(setup, "optional_command", return_value=True), \
+             mock.patch.object(setup, "enable_discovered_extension"), \
              mock.patch.object(setup, "ensure_extension_enabled"), \
              mock.patch.object(setup, "remove_enabled_extension"):
             setup.install(self.paths, self.state, binary, no_shortcuts=True)
@@ -160,6 +161,23 @@ class SetupTests(unittest.TestCase):
             self.assertEqual(arrays, ["another@example.org", setup.UUID])
             setup.remove_enabled_extension()
         self.assertEqual(arrays, ["another@example.org"])
+
+    def test_new_extension_waits_for_shell_login(self):
+        listing = subprocess.CompletedProcess([], 0, "another@example.org\n", "")
+        output = io.StringIO()
+        with mock.patch.object(setup, "run", return_value=listing), \
+             mock.patch.object(setup, "optional_command") as enable, \
+             mock.patch("sys.stdout", output):
+            setup.enable_discovered_extension()
+        enable.assert_not_called()
+        self.assertIn("log out and log back in", output.getvalue())
+
+    def test_discovered_extension_is_enabled(self):
+        listing = subprocess.CompletedProcess([], 0, f"{setup.UUID}\n", "")
+        with mock.patch.object(setup, "run", return_value=listing), \
+             mock.patch.object(setup, "optional_command") as enable:
+            setup.enable_discovered_extension()
+        enable.assert_called_once_with("gnome-extensions", "enable", setup.UUID)
 
     def test_real_gsettings_round_trip_in_isolated_keyfile(self):
         (self.paths["extension"] / "schemas/gschemas.compiled").unlink()

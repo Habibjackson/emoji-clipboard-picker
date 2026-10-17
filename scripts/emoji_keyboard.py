@@ -274,6 +274,17 @@ def ensure_extension_enabled() -> None:
         print("GNOME extension queued for the next login; other extensions are unchanged.")
 
 
+def enable_discovered_extension() -> None:
+    try:
+        discovered = run("gnome-extensions", "list", check=False)
+    except FileNotFoundError:
+        discovered = None
+    if discovered is None or discovered.returncode != 0 or UUID not in discovered.stdout.splitlines():
+        print("GNOME Shell has not discovered the extension yet; log out and log back in.")
+        return
+    optional_command("gnome-extensions", "enable", UUID)
+
+
 def remove_enabled_extension() -> None:
     schema, key = "org.gnome.shell", "enabled-extensions"
     current = parse_string_array(run("gsettings", "get", schema, key).stdout.strip(),
@@ -313,7 +324,7 @@ def install(paths: dict[str, Path], state: dict, binary: Path, no_shortcuts: boo
     optional_command("systemctl", "--user", "enable", "--now", "emoji-keyboard.service")
     optional_command("systemctl", "--user", "try-restart", "emoji-keyboard.service")
     if is_gnome_session():
-        optional_command("gnome-extensions", "enable", UUID)
+        enable_discovered_extension()
         ensure_extension_enabled()
     print("Installed for this user. On GNOME Wayland, log out and log in so Shell discovers a new extension.")
     if not no_shortcuts:
@@ -430,7 +441,10 @@ def status(paths: dict[str, Path], recheck: bool) -> int:
     if problems:
         print("Needs attention: " + ", ".join(problems))
         if recheck:
-            print("Run setup-shortcuts for known GNOME conflicts; inspect other extensions if keys remain unavailable.")
+            if gnome and not x11 and not active_extension:
+                print("Log out and log back in after installing the extension, then run recheck.")
+            if any(problem.endswith("shortcut") for problem in problems):
+                print("Run setup-shortcuts for known GNOME conflicts; inspect other extensions if keys remain unavailable.")
     else:
         print("Known setup checks passed; press each shortcut in an application to verify registration.")
     return 1 if recheck and problems else 0
