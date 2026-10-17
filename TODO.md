@@ -52,8 +52,8 @@
 
 ## 5. Build the QML picker
 
-- [ ] Use a compact desktop window with two views: **Emoji** and **Clipboard**. Open the requested view directly from its shortcut; repeated activation toggles or switches the view predictably.
-- [ ] Emoji view: search field, persistent Recents, category navigation, lazy emoji grid, accessible names, and skin-tone variant chooser.
+- [x] Use a compact desktop window with two views: **Emoji** and **Clipboard**. Open the requested view directly from its shortcut; repeated activation toggles or switches the view predictably. (GNOME Shell passes picker focus to the Qt service; X11 checks its focused window. Switching views preserves the original paste target.)
+- [x] Emoji view: search field, persistent Recents, category navigation, lazy emoji grid, accessible names, and skin-tone variant chooser. (The live X11 keyboard check selected an emoji and an exact skin-tone variant; search text survived a view switch.)
 - [x] Clipboard view: Pinned section, newest-first Recent section, text previews, image thumbnails, search/filter, Pin/Unpin, Delete, Clear recent, and pause control.
 - [ ] Use Qt Quick Templates for customized controls, system-aware light/dark colors, scalable typography, and a visible keyboard focus ring. (Controls, theme, and focus rings are implemented; large-font verification remains.)
 - [ ] Support Tab, arrow keys, Enter, and Escape throughout. Ensure every pointer action also works from the keyboard and has an accessible label.

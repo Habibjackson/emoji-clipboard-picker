@@ -14,6 +14,25 @@
 #include <QTemporaryDir>
 #include <QtTest>
 
+class RecordingBackend final : public DesktopIntegration
+{
+public:
+    RecordingBackend(QQuickWindow *window, AppController *controller)
+        : DesktopIntegration(window, controller) {}
+
+    bool isAvailable() const override { return true; }
+    QString errorString() const override { return {}; }
+    void captureClipboard(const QString &) override {}
+    void openView(const QString &view) override { showWindow(view); }
+    bool rememberTarget() override { ++rememberCount; targetArmed = true; return true; }
+    void pasteSelection(bool, quint64) override {}
+    void cancel() override { ++cancelCount; targetArmed = false; }
+
+    int rememberCount = 0;
+    int cancelCount = 0;
+    bool targetArmed = false;
+};
+
 class DesktopIntegrationTest final : public QObject
 {
     Q_OBJECT
@@ -23,6 +42,7 @@ private slots:
     void gnomeAvailabilityChanges();
     void copyOnlyFallback();
     void shortcutFailurePersistsAfterCopy();
+    void repeatedActivationTogglesAndSwitches();
 };
 
 void DesktopIntegrationTest::gnomeUnavailableCopiesOnly()
@@ -48,8 +68,8 @@ void DesktopIntegrationTest::gnomeUnavailableCopiesOnly()
     QVERIFY(controller.copyOnly());
     QVERIFY(controller.integrationWarning().contains(QStringLiteral("GNOME Shell extension")));
 
-    QCOMPARE(service.ShowFromShortcut(QStringLiteral("invalid")), 0u);
-    QCOMPARE(service.ShowFromShortcut(QStringLiteral("clipboard")), 0u);
+    QCOMPARE(service.ShowFromShortcut(QStringLiteral("invalid"), false), 0u);
+    QCOMPARE(service.ShowFromShortcut(QStringLiteral("clipboard"), false), 0u);
     QCOMPARE(service.CurrentView(), QStringLiteral("clipboard"));
     QVERIFY(service.IsVisible());
 
@@ -66,7 +86,7 @@ void DesktopIntegrationTest::gnomeUnavailableCopiesOnly()
                           QStringLiteral("org.emojikeyboard.App"), bus);
     QVERIFY(remote.isValid());
     QDBusPendingCallWatcher call(remote.asyncCall(QStringLiteral("ShowFromShortcut"),
-                                                   QStringLiteral("emoji")));
+                                                   QStringLiteral("emoji"), false));
     QTRY_VERIFY_WITH_TIMEOUT(call.isFinished(), 3000);
     const QDBusPendingReply<uint> reply = call;
     QVERIFY2(reply.isValid(), qPrintable(reply.error().message()));
@@ -123,7 +143,7 @@ void DesktopIntegrationTest::copyOnlyFallback()
     QCOMPARE(integration->errorString(), QStringLiteral("Native backend unavailable"));
     QVERIFY(controller.copyOnly());
     QCOMPARE(controller.integrationWarning(), QStringLiteral("Native backend unavailable"));
-    QCOMPARE(service.ShowFromShortcut(QStringLiteral("clipboard")), 0u);
+    QCOMPARE(service.ShowFromShortcut(QStringLiteral("clipboard"), false), 0u);
     QCOMPARE(service.CurrentView(), QStringLiteral("clipboard"));
     controller.copyEmoji(QStringLiteral("🎉"));
     QVERIFY(!controller.hasEmojiClipboardSnapshot());
@@ -151,6 +171,49 @@ void DesktopIntegrationTest::shortcutFailurePersistsAfterCopy()
     QVERIFY(controller.integrationWarning().contains(QStringLiteral("Super+.")));
     QVERIFY(controller.integrationWarning().contains(QStringLiteral("Super+V")));
     QCOMPARE(controller.status(), QStringLiteral("Emoji copied. Paste it in your app."));
+}
+
+void DesktopIntegrationTest::repeatedActivationTogglesAndSwitches()
+{
+    QTemporaryDir directory;
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QVERIFY(store.open());
+    AppController controller(&store, QStringLiteral("emoji"));
+    QQuickWindow window;
+    window.setProperty("currentView", QStringLiteral("emoji"));
+    RecordingBackend backend(&window, &controller);
+    PickerService service(&window, &controller, &backend);
+    const uint pid = uint(QCoreApplication::applicationPid());
+
+    QCOMPARE(service.ShowFromShortcut(QStringLiteral("emoji"), false), pid);
+    QVERIFY(service.IsVisible());
+    QCOMPARE(backend.rememberCount, 1);
+    QVERIFY(backend.targetArmed);
+
+    QCOMPARE(service.ShowFromShortcut(QStringLiteral("clipboard"), true), pid);
+    QVERIFY(service.IsVisible());
+    QCOMPARE(service.CurrentView(), QStringLiteral("clipboard"));
+    QCOMPARE(backend.rememberCount, 1);
+    QVERIFY(backend.targetArmed);
+
+    QCOMPARE(service.ShowFromShortcut(QStringLiteral("clipboard"), false), pid);
+    QVERIFY(service.IsVisible());
+    QCOMPARE(backend.rememberCount, 2);
+    QVERIFY(backend.targetArmed);
+
+    QCOMPARE(service.ShowFromShortcut(QStringLiteral("clipboard"), true), pid);
+    QVERIFY(!service.IsVisible());
+    QCOMPARE(backend.cancelCount, 1);
+    QVERIFY(!backend.targetArmed);
+
+    QCOMPARE(service.ShowFromShortcut(QStringLiteral("clipboard"), false), pid);
+    QVERIFY(service.IsVisible());
+    QCOMPARE(backend.rememberCount, 3);
+    service.ShowEmoji();
+    QCOMPARE(service.CurrentView(), QStringLiteral("emoji"));
+    QCOMPARE(backend.cancelCount, 2);
+    service.ShowEmoji();
+    QVERIFY(!service.IsVisible());
 }
 
 int main(int argc, char *argv[])

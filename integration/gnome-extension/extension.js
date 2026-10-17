@@ -209,14 +209,16 @@ export default class EmojiKeyboardExtension extends Extension {
 
     _showFromShortcut(view) {
         const focused = global.display.get_focus_window();
-        if (!focused || focused.get_pid() !== this._pickerPid)
+        const pickerFocused = this._pickerPid !== 0 && !!focused
+            && focused.get_pid() === this._pickerPid;
+        if (!pickerFocused)
             this._targetWindow = focused;
         this._openClipboardRevision = this._clipboardRevision;
         this._pasteGeneration++;
 
         this._bus.call('org.emojikeyboard.App', '/org/emojikeyboard/App',
             'org.emojikeyboard.App', 'ShowFromShortcut',
-            new GLib.Variant('(s)', [view]), new GLib.VariantType('(u)'),
+            new GLib.Variant('(sb)', [view, pickerFocused]), new GLib.VariantType('(u)'),
             Gio.DBusCallFlags.NONE, -1, null, (connection, result) => {
                 try {
                     const reply = connection.call_finish(result);

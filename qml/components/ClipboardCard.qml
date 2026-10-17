@@ -19,12 +19,17 @@ T.Control {
 
     implicitHeight: kind === "image" ? 124 : 104
     padding: 12
+    activeFocusOnTab: true
+    Accessible.name: kind === "image" ? qsTr("Image, %1").arg(previewText) : previewText
+    Accessible.description: qsTr("Press Enter to copy")
+    Keys.onReturnPressed: card.copyRequested()
+    Keys.onEnterPressed: card.copyRequested()
 
     background: Rectangle {
         radius: Theme.radius
         color: Theme.surface
-        border.color: Theme.line
-        border.width: 1
+        border.color: card.activeFocus ? Theme.accent : Theme.line
+        border.width: card.activeFocus ? 2 : 1
     }
 
     contentItem: RowLayout {

@@ -18,6 +18,10 @@ void PickerService::ShowEmoji()
 {
     if (!m_backend)
         return;
+    if (IsVisible() && CurrentView() == QStringLiteral("emoji")) {
+        Hide();
+        return;
+    }
     m_backend->cancel();
     m_backend->openView(QStringLiteral("emoji"));
 }
@@ -26,14 +30,25 @@ void PickerService::ShowClipboard()
 {
     if (!m_backend)
         return;
+    if (IsVisible() && CurrentView() == QStringLiteral("clipboard")) {
+        Hide();
+        return;
+    }
     m_backend->cancel();
     m_backend->openView(QStringLiteral("clipboard"));
 }
 
-uint PickerService::ShowFromShortcut(const QString &view)
+uint PickerService::ShowFromShortcut(const QString &view, bool pickerFocused)
 {
     if (!m_backend || (view != QStringLiteral("emoji") && view != QStringLiteral("clipboard")))
         return 0;
+    if (IsVisible() && pickerFocused) {
+        if (CurrentView() == view)
+            Hide();
+        else
+            m_backend->openView(view);
+        return uint(QCoreApplication::applicationPid());
+    }
     const bool targetKnown = m_backend->rememberTarget();
     m_backend->openView(view);
     return targetKnown ? uint(QCoreApplication::applicationPid()) : 0;

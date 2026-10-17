@@ -34,6 +34,7 @@ signals:
 
 private:
     void processEvents();
+    void activateShortcutView(const QString &view);
     bool grabShortcut(unsigned int keycode);
     void releaseShortcut(unsigned int keycode);
     bool windowExists(unsigned long window) const;

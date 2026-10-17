@@ -117,12 +117,18 @@ T.ApplicationWindow {
                     clip: true
                     spacing: 2
                     model: window.controller.emojiModel.categories
+                    activeFocusOnTab: true
                     delegate: CategoryButton {
+                        required property int index
                         required property string modelData
                         width: categories.width
                         categoryName: modelData
                         selected: window.controller.emojiModel.category === categoryName
-                        onClicked: window.controller.emojiModel.category = categoryName
+                        focus: ListView.isCurrentItem
+                        onClicked: {
+                            categories.currentIndex = index
+                            window.controller.emojiModel.category = categoryName
+                        }
                     }
                 }
 

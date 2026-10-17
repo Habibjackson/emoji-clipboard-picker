@@ -12,6 +12,8 @@ T.Button {
     implicitWidth: 156
     hoverEnabled: true
     Accessible.name: categoryName
+    Keys.onReturnPressed: control.clicked()
+    Keys.onEnterPressed: control.clicked()
 
     contentItem: Text {
         text: control.text

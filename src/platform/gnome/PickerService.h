@@ -21,7 +21,7 @@ public:
 public slots:
     Q_SCRIPTABLE void ShowEmoji();
     Q_SCRIPTABLE void ShowClipboard();
-    Q_SCRIPTABLE uint ShowFromShortcut(const QString &view);
+    Q_SCRIPTABLE uint ShowFromShortcut(const QString &view, bool pickerFocused);
     Q_SCRIPTABLE void NotifyClipboardChanged(const QString &kind);
     Q_SCRIPTABLE void Hide();
     Q_SCRIPTABLE void Quit();

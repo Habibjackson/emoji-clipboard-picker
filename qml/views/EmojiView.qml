@@ -9,6 +9,8 @@ Item {
 
     required property AppController controller
 
+    Component.onCompleted: search.forceActiveFocus()
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 16
@@ -39,8 +41,10 @@ Item {
         SearchField {
             id: search
             Layout.fillWidth: true
+            text: view.controller.emojiModel.query
             placeholderText: qsTr("Search emoji by name or keyword")
             onTextChanged: view.controller.emojiModel.query = text
+            KeyNavigation.tab: grid
         }
 
         RowLayout {
@@ -72,10 +76,13 @@ Item {
             model: view.controller.emojiModel
             reuseItems: true
             boundsBehavior: Flickable.StopAtBounds
+            activeFocusOnTab: true
+            KeyNavigation.backtab: search
 
             delegate: EmojiTile {
                 width: grid.cellWidth - 8
                 height: grid.cellHeight - 8
+                focus: GridView.isCurrentItem
                 onPicked: symbol => view.controller.copyEmoji(symbol)
                 onVariantsRequested: (symbol, emojiName) => {
                     variantPopup.baseName = emojiName
@@ -115,6 +122,7 @@ Item {
         focus: true
         closePolicy: T.Popup.CloseOnEscape | T.Popup.CloseOnPressOutside
         onOpened: variantGrid.forceActiveFocus()
+        onClosed: grid.forceActiveFocus()
 
         background: Rectangle {
             radius: Theme.radius
@@ -151,22 +159,11 @@ Item {
                 clip: true
                 reuseItems: true
                 boundsBehavior: Flickable.StopAtBounds
-                Keys.onReturnPressed: {
-                    if (currentIndex >= 0) {
-                        variantPopup.close()
-                        view.controller.copyEmoji(variantPopup.choices[currentIndex].symbol)
-                    }
-                }
-                Keys.onSpacePressed: {
-                    if (currentIndex >= 0) {
-                        variantPopup.close()
-                        view.controller.copyEmoji(variantPopup.choices[currentIndex].symbol)
-                    }
-                }
                 delegate: EmojiTile {
                     required property var modelData
                     width: variantGrid.cellWidth - 8
                     height: variantGrid.cellHeight - 8
+                    focus: GridView.isCurrentItem
                     symbol: modelData.symbol
                     emojiName: modelData.emojiName
                     variantCount: 0

@@ -170,16 +170,33 @@ void X11Backend::processEvents()
             captureClipboard(QString());
         } else if (event.type == KeyPress && (event.xkey.state & Mod4Mask)) {
             if (m_emojiGrabbed && event.xkey.keycode == m_emojiKeycode) {
-                rememberTarget();
-                openView(QStringLiteral("emoji"));
-                emit shortcutTriggered(QStringLiteral("emoji"));
+                activateShortcutView(QStringLiteral("emoji"));
             } else if (m_clipboardGrabbed && event.xkey.keycode == m_clipboardKeycode) {
-                rememberTarget();
-                openView(QStringLiteral("clipboard"));
-                emit shortcutTriggered(QStringLiteral("clipboard"));
+                activateShortcutView(QStringLiteral("clipboard"));
             }
         }
     }
+}
+
+void X11Backend::activateShortcutView(const QString &view)
+{
+    Window focused = None;
+    int revert = 0;
+    XGetInputFocus(m_display, &focused, &revert);
+    const bool pickerFocused = m_window && m_window->isVisible()
+        && focused == Window(m_window->winId());
+    if (pickerFocused) {
+        if (m_window->property("currentView").toString() == view) {
+            cancel();
+            m_window->hide();
+        } else {
+            openView(view);
+        }
+    } else {
+        rememberTarget();
+        openView(view);
+    }
+    emit shortcutTriggered(view);
 }
 
 bool X11Backend::rememberTarget()

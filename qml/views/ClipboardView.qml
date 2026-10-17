@@ -8,6 +8,8 @@ Item {
 
     required property AppController controller
 
+    Component.onCompleted: search.forceActiveFocus()
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 14
@@ -52,8 +54,10 @@ Item {
         SearchField {
             id: search
             Layout.fillWidth: true
+            text: view.controller.clipboardModel.query
             placeholderText: qsTr("Search saved text")
             onTextChanged: view.controller.clipboardModel.query = text
+            KeyNavigation.tab: list
         }
 
         RowLayout {
@@ -92,6 +96,8 @@ Item {
             model: view.controller.clipboardModel
             reuseItems: true
             boundsBehavior: Flickable.StopAtBounds
+            activeFocusOnTab: true
+            KeyNavigation.backtab: search
             section.property: "section"
             section.criteria: ViewSection.FullString
             section.delegate: Text {
@@ -107,6 +113,7 @@ Item {
             }
             delegate: ClipboardCard {
                 width: list.width - 8
+                focus: ListView.isCurrentItem
                 canPin: view.controller.clipboardModel.totalPinnedCount < 5
                 onCopyRequested: view.controller.copyEntry(entryId)
                 onPinRequested: pinned => view.controller.pinEntry(entryId, pinned)

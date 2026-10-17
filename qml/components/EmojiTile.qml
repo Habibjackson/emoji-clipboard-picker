@@ -12,6 +12,13 @@ T.Button {
     signal picked(string symbol)
     signal variantsRequested(string symbol, string emojiName)
 
+    function activate() {
+        if (variantCount > 0)
+            variantsRequested(symbol, emojiName)
+        else
+            picked(symbol)
+    }
+
     implicitWidth: 72
     implicitHeight: 72
     hoverEnabled: true
@@ -19,12 +26,10 @@ T.Button {
                      ? qsTr("%1, choose from %2 skin tone options").arg(emojiName).arg(variantCount + 1)
                      : emojiName
     Accessible.description: renderable ? "" : qsTr("Emoji glyph unavailable. Selecting still copies the emoji.")
-    onClicked: {
-        if (variantCount > 0)
-            variantsRequested(symbol, emojiName)
-        else
-            picked(symbol)
-    }
+    onClicked: activate()
+    Keys.onReturnPressed: activate()
+    Keys.onEnterPressed: activate()
+    Keys.onSpacePressed: activate()
 
     contentItem: Column {
         spacing: 0

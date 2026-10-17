@@ -15,6 +15,8 @@ T.Button {
     font.family: Theme.bodyFamily
     font.pixelSize: 13
     Accessible.name: accessibilityLabel
+    Keys.onReturnPressed: control.clicked()
+    Keys.onEnterPressed: control.clicked()
 
     contentItem: Text {
         id: label
