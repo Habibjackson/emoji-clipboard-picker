@@ -12,6 +12,8 @@ qt_standard_project_setup(REQUIRES 6.11)
 
 qt_add_executable(emoji-keyboard
     src/main.cpp
+    src/platform/DesktopIntegration.h src/platform/DesktopIntegration.cpp
+    src/platform/gnome/GnomeBackend.h src/platform/gnome/GnomeBackend.cpp
     src/platform/gnome/PickerService.h src/platform/gnome/PickerService.cpp
 )
 
@@ -134,6 +136,29 @@ if(BUILD_TESTING)
     set_tests_properties(app_controller PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
 
+    find_program(DBUS_RUN_SESSION_EXECUTABLE NAMES dbus-run-session)
+    if(DBUS_RUN_SESSION_EXECUTABLE)
+        qt_add_executable(tst_desktop_integration
+            tests/integration/tst_desktop_integration.cpp
+            src/platform/DesktopIntegration.h src/platform/DesktopIntegration.cpp
+            src/platform/gnome/GnomeBackend.h src/platform/gnome/GnomeBackend.cpp
+            src/platform/gnome/PickerService.h src/platform/gnome/PickerService.cpp
+            src/app/AppController.cpp
+            src/models/EmojiModel.cpp
+            src/models/ClipboardModel.cpp
+            src/storage/HistoryStore.cpp)
+        qt_add_resources(tst_desktop_integration desktop_test_emoji_data
+            PREFIX /data FILES resources/emoji/emoji-test.txt)
+        target_include_directories(tst_desktop_integration PRIVATE src)
+        target_link_libraries(tst_desktop_integration PRIVATE
+            Qt6::DBus Qt6::Quick Qt6::Sql Qt6::Test)
+        add_test(NAME desktop_integration
+            COMMAND "${DBUS_RUN_SESSION_EXECUTABLE}" --
+                "$<TARGET_FILE:tst_desktop_integration>")
+        set_tests_properties(desktop_integration PROPERTIES
+            ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
+    endif()
+
     find_program(GJS_EXECUTABLE NAMES gjs)
     if(GJS_EXECUTABLE)
         add_test(NAME gnome_clipboard_probe
@@ -162,6 +187,7 @@ if(BUILD_TESTING)
 
         qt_add_executable(tst_x11_backend
             tests/integration/tst_x11_backend.cpp
+            src/platform/DesktopIntegration.h src/platform/DesktopIntegration.cpp
             src/platform/x11/X11Backend.h src/platform/x11/X11Backend.cpp
             src/app/AppController.cpp
             src/models/EmojiModel.cpp

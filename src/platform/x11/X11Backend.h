@@ -1,7 +1,7 @@
 #pragma once
 
-#include <QObject>
-#include <QPointer>
+#include "platform/DesktopIntegration.h"
+
 #include <QString>
 
 struct _XDisplay;
@@ -9,7 +9,7 @@ class AppController;
 class QQuickWindow;
 class QSocketNotifier;
 
-class X11Backend : public QObject
+class X11Backend : public DesktopIntegration
 {
     Q_OBJECT
 
@@ -18,10 +18,14 @@ public:
                         QObject *parent = nullptr);
     ~X11Backend() override;
 
-    bool isAvailable() const;
-    QString errorString() const;
+    bool isAvailable() const override;
+    QString errorString() const override;
     quint64 clipboardEventCount() const;
-    void disarm();
+    void captureClipboard(const QString &kind) override;
+    void openView(const QString &view) override;
+    bool rememberTarget() override;
+    void pasteSelection(bool emoji, quint64 snapshotGeneration) override;
+    void cancel() override;
 
 signals:
     void clipboardOwnerChanged();
@@ -30,8 +34,6 @@ signals:
 
 private:
     void processEvents();
-    void openView(const QString &view);
-    void pasteSelection();
     bool grabShortcut(unsigned int keycode);
     void releaseShortcut(unsigned int keycode);
     bool windowExists(unsigned long window) const;
@@ -40,8 +42,6 @@ private:
 
     struct _XDisplay *m_display = nullptr;
     QSocketNotifier *m_notifier = nullptr;
-    QPointer<QQuickWindow> m_window;
-    QPointer<AppController> m_controller;
     QString m_error;
     unsigned long m_root = 0;
     unsigned long m_target = 0;

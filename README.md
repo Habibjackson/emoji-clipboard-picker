@@ -37,6 +37,7 @@ History is stored in SQLite under Qt's user-specific `AppDataLocation` with a pr
 | `src/app/` | Application state and QML-facing controllers |
 | `src/models/` | Emoji and clipboard list models |
 | `src/storage/` | SQLite history and migrations |
+| `src/platform/DesktopIntegration.*` | Shared desktop backend contract and copy-only fallback |
 | `src/platform/gnome/` | GNOME Wayland D-Bus bridge |
 | `src/platform/x11/` | X11 clipboard, shortcuts, and paste backend |
 | `qml/views/`, `qml/components/` | Picker views and reusable controls |

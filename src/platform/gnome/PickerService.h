@@ -4,17 +4,19 @@
 #include <QPointer>
 #include <QString>
 
-class QQuickWindow;
 class AppController;
+class DesktopIntegration;
+class QQuickWindow;
 
+// Stable D-Bus surface used by the GNOME extension and repeated app launches.
 class PickerService : public QObject
 {
     Q_OBJECT
     Q_CLASSINFO("D-Bus Interface", "org.emojikeyboard.App")
 
 public:
-    explicit PickerService(QQuickWindow *window, AppController *controller,
-                           QObject *parent = nullptr);
+    PickerService(QQuickWindow *window, AppController *controller,
+                  DesktopIntegration *backend, QObject *parent = nullptr);
 
 public slots:
     Q_SCRIPTABLE void ShowEmoji();
@@ -27,15 +29,8 @@ public slots:
     Q_SCRIPTABLE QString CurrentStatus() const;
     Q_SCRIPTABLE bool IsVisible() const;
 
-signals:
-    void manualActivation();
-
 private:
-    void showView(const QString &view);
-    void pasteSelection(bool emoji, quint64 snapshotGeneration);
-    void restoreClipboard(quint64 snapshotGeneration, uint clipboardRevision);
-
     QPointer<QQuickWindow> m_window;
     QPointer<AppController> m_controller;
-    bool m_shortcutTargetArmed = false;
+    QPointer<DesktopIntegration> m_backend;
 };
