@@ -6,11 +6,14 @@ T.Button {
 
     property bool selected: false
     property bool prominent: false
+    property bool menuItem: false
+    property bool dense: false
     property string accessibilityLabel: text
 
     implicitHeight: Math.max(44, Theme.fontSize(40))
-    implicitWidth: Math.max(Theme.fontSize(72), label.implicitWidth + Theme.fontSize(28))
-    padding: Theme.fontSize(10)
+    implicitWidth: Math.max(Theme.fontSize(dense ? 44 : 72),
+                            label.implicitWidth + Theme.fontSize(dense ? 14 : 28))
+    padding: Theme.fontSize(dense ? 6 : 10)
     hoverEnabled: true
     font.family: Theme.bodyFamily
     font.pixelSize: Theme.fontSize(13)
@@ -25,10 +28,11 @@ T.Button {
                                : control.prominent ? Theme.accentInk
                                  : control.selected ? Theme.accent : Theme.ink
         font.family: Theme.bodyFamily
-        font.pixelSize: Theme.fontSize(13)
+        font.pixelSize: control.font.pixelSize
         font.weight: control.selected || control.prominent ? Font.DemiBold : Font.Medium
-        horizontalAlignment: Text.AlignHCenter
+        horizontalAlignment: control.menuItem ? Text.AlignLeft : Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
+        leftPadding: control.menuItem ? Theme.fontSize(10) : 0
         elide: Text.ElideRight
     }
 

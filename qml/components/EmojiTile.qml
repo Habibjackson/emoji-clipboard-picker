@@ -8,6 +8,7 @@ T.Button {
     required property string emojiName
     required property int variantCount
     required property bool renderable
+    property bool compact: false
 
     signal picked(string symbol)
     signal variantsRequested(string symbol, string emojiName)
@@ -19,8 +20,8 @@ T.Button {
             picked(symbol)
     }
 
-    implicitWidth: Theme.fontSize(72)
-    implicitHeight: Theme.fontSize(72)
+    implicitWidth: Theme.fontSize(compact ? 54 : 72)
+    implicitHeight: Theme.fontSize(compact ? 54 : 72)
     hoverEnabled: true
     Accessible.name: variantCount > 0
                      ? qsTr("%1, choose from %2 skin tone options").arg(emojiName).arg(variantCount + 1)
@@ -35,12 +36,12 @@ T.Button {
         spacing: 0
         Item {
             width: parent.width
-            height: Theme.fontSize(48)
+            height: control.compact ? control.availableHeight : Theme.fontSize(48)
             Text {
                 anchors.fill: parent
                 visible: control.renderable
                 text: control.symbol
-                font.pixelSize: Theme.fontSize(29)
+                font.pixelSize: Theme.fontSize(control.compact ? 30 : 29)
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 renderType: Text.NativeRendering
@@ -62,6 +63,7 @@ T.Button {
         Text {
             width: parent.width
             height: Theme.fontSize(18)
+            visible: !control.compact
             text: control.emojiName
             textFormat: Text.PlainText
             color: Theme.muted

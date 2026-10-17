@@ -8,89 +8,91 @@ Item {
     id: view
 
     required property AppController controller
-    readonly property bool compact: width < Theme.fontSize(420)
 
     Component.onCompleted: search.forceActiveFocus()
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: Theme.fontSize(view.compact ? 8 : 16)
-
-        ColumnLayout {
-            Layout.fillWidth: true
-            spacing: Theme.fontSize(4)
-
-            Text {
-                Layout.fillWidth: true
-                Layout.minimumWidth: 0
-                text: view.controller.emojiModel.query.length > 0
-                      ? qsTr("Search results")
-                      : view.controller.emojiModel.category === "All"
-                        ? qsTr("Find an emoji")
-                        : view.controller.emojiModel.category
-                color: Theme.ink
-                font.family: Theme.bodyFamily
-                font.pixelSize: Theme.fontSize(26)
-                font.weight: Font.Bold
-                wrapMode: Text.Wrap
-            }
-            Text {
-                Layout.fillWidth: true
-                Layout.minimumWidth: 0
-                visible: !view.compact
-                text: qsTr("Choose an emoji to copy. Tiles marked ▾ offer skin tones.")
-                color: Theme.muted
-                font.family: Theme.bodyFamily
-                font.pixelSize: Theme.fontSize(13)
-                wrapMode: Text.Wrap
-            }
-        }
+        spacing: Theme.fontSize(7)
 
         SearchField {
             id: search
             Layout.fillWidth: true
             text: view.controller.emojiModel.query
-            placeholderText: qsTr("Search emoji by name or keyword")
+            placeholderText: qsTr("Search emoji")
             onTextChanged: view.controller.emojiModel.query = text
+            KeyNavigation.tab: categories
+        }
+
+        ListView {
+            id: categories
+            Layout.fillWidth: true
+            Layout.preferredHeight: Theme.fontSize(44)
+            orientation: ListView.Horizontal
+            spacing: Theme.fontSize(5)
+            clip: true
+            model: view.controller.emojiModel.categories
+            boundsBehavior: Flickable.StopAtBounds
+            activeFocusOnTab: true
+            KeyNavigation.backtab: search
             KeyNavigation.tab: grid
+
+            delegate: CategoryButton {
+                required property int index
+                required property string modelData
+                width: implicitWidth
+                categoryName: modelData
+                selected: view.controller.emojiModel.category === categoryName
+                focus: ListView.isCurrentItem
+                onClicked: {
+                    categories.currentIndex = index
+                    categories.positionViewAtIndex(index, ListView.Contain)
+                    view.controller.emojiModel.category = categoryName
+                }
+            }
         }
 
         RowLayout {
             Layout.fillWidth: true
+            Layout.preferredHeight: Theme.fontSize(20)
+
             Text {
-                text: qsTr("%1 choices").arg(view.controller.emojiModel.resultCount)
+                Layout.fillWidth: true
+                text: view.controller.emojiModel.query.length > 0
+                      ? qsTr("%1 search results").arg(view.controller.emojiModel.resultCount)
+                      : qsTr("%1 emoji").arg(view.controller.emojiModel.resultCount)
                 color: Theme.muted
                 font.family: Theme.bodyFamily
-                font.pixelSize: Theme.fontSize(12)
+                font.pixelSize: Theme.fontSize(11)
+                elide: Text.ElideRight
             }
-            Item { Layout.fillWidth: true }
             Text {
-                visible: !view.compact
-                text: qsTr("PICK · ▾ FOR TONES")
+                text: qsTr("▾ skin tones")
                 color: Theme.accent
                 font.family: Theme.bodyFamily
                 font.pixelSize: Theme.fontSize(10)
-                font.weight: Font.Bold
-                font.letterSpacing: 1.3
             }
         }
 
         GridView {
             id: grid
+            readonly property int columnCount: Math.max(4, Math.floor(width / Theme.fontSize(56)))
+
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            cellWidth: Theme.fontSize(80)
-            cellHeight: Theme.fontSize(80)
+            cellWidth: width / columnCount
+            cellHeight: Theme.fontSize(58)
             model: view.controller.emojiModel
             reuseItems: true
             boundsBehavior: Flickable.StopAtBounds
             activeFocusOnTab: true
-            KeyNavigation.backtab: search
+            KeyNavigation.backtab: categories
 
             delegate: EmojiTile {
-                width: grid.cellWidth - Theme.fontSize(8)
-                height: grid.cellHeight - Theme.fontSize(8)
+                width: grid.cellWidth - Theme.fontSize(4)
+                height: grid.cellHeight - Theme.fontSize(4)
+                compact: true
                 focus: GridView.isCurrentItem
                 onPicked: symbol => view.controller.copyEmoji(symbol)
                 onVariantsRequested: (symbol, emojiName) => {
@@ -102,14 +104,14 @@ Item {
 
             Text {
                 anchors.centerIn: parent
-                width: parent.width - 24
+                width: parent.width - Theme.fontSize(24)
                 visible: view.controller.emojiModel.resultCount === 0
                 text: view.controller.emojiModel.category === "Recent"
                       ? qsTr("Your recently copied emoji will appear here.")
                       : qsTr("No emoji found. Try another name.")
                 color: Theme.muted
                 font.family: Theme.bodyFamily
-                font.pixelSize: Theme.fontSize(14)
+                font.pixelSize: Theme.fontSize(13)
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap
             }
@@ -124,10 +126,11 @@ Item {
 
         x: (view.width - width) / 2
         y: (view.height - height) / 2
-        width: Math.min(view.width - 24, Theme.fontSize(360))
-        height: Math.min(view.height - 24,
-                         Math.ceil(choices.length / 4) * Theme.fontSize(80) + Theme.fontSize(96))
-        padding: Theme.fontSize(16)
+        width: Math.min(view.width - Theme.fontSize(16), Theme.fontSize(340))
+        height: Math.min(view.height - Theme.fontSize(16),
+                         Math.ceil(choices.length / 4) * Theme.fontSize(60)
+                         + Theme.fontSize(90))
+        padding: Theme.fontSize(14)
         modal: true
         focus: true
         closePolicy: T.Popup.CloseOnEscape | T.Popup.CloseOnPressOutside
@@ -142,13 +145,14 @@ Item {
         }
 
         contentItem: ColumnLayout {
-            spacing: Theme.fontSize(10)
+            spacing: Theme.fontSize(7)
+
             Text {
                 Layout.fillWidth: true
                 text: qsTr("Choose a skin tone")
                 color: Theme.ink
                 font.family: Theme.bodyFamily
-                font.pixelSize: Theme.fontSize(18)
+                font.pixelSize: Theme.fontSize(17)
                 font.weight: Font.Bold
             }
             Text {
@@ -156,7 +160,7 @@ Item {
                 text: variantPopup.baseName
                 color: Theme.muted
                 font.family: Theme.bodyFamily
-                font.pixelSize: Theme.fontSize(12)
+                font.pixelSize: Theme.fontSize(11)
                 elide: Text.ElideRight
             }
             GridView {
@@ -164,15 +168,17 @@ Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 model: variantPopup.choices
-                cellWidth: Theme.fontSize(80)
-                cellHeight: Theme.fontSize(80)
+                cellWidth: width / 4
+                cellHeight: Theme.fontSize(60)
                 clip: true
                 reuseItems: true
                 boundsBehavior: Flickable.StopAtBounds
+
                 delegate: EmojiTile {
                     required property var modelData
-                    width: variantGrid.cellWidth - Theme.fontSize(8)
-                    height: variantGrid.cellHeight - Theme.fontSize(8)
+                    width: variantGrid.cellWidth - Theme.fontSize(4)
+                    height: variantGrid.cellHeight - Theme.fontSize(4)
+                    compact: true
                     focus: GridView.isCurrentItem
                     symbol: modelData.symbol
                     emojiName: modelData.emojiName

@@ -9,20 +9,21 @@ T.Button {
 
     text: categoryName
     implicitHeight: Math.max(44, Theme.fontSize(40))
-    implicitWidth: Theme.fontSize(156)
+    implicitWidth: Math.max(Theme.fontSize(58), label.implicitWidth + Theme.fontSize(22))
     hoverEnabled: true
     Accessible.name: categoryName
     Keys.onReturnPressed: control.clicked()
     Keys.onEnterPressed: control.clicked()
 
     contentItem: Text {
+        id: label
         text: control.text
         color: control.selected ? Theme.accent : Theme.muted
         font.family: Theme.bodyFamily
-        font.pixelSize: Theme.fontSize(13)
+        font.pixelSize: Theme.fontSize(12)
         font.weight: control.selected ? Font.DemiBold : Font.Medium
         verticalAlignment: Text.AlignVCenter
-        leftPadding: Theme.fontSize(14)
+        horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
     }
     background: Rectangle {
