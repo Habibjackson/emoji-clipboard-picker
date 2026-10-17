@@ -13,7 +13,7 @@ Item {
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: Theme.fontSize(7)
+        spacing: Theme.layoutSize(6)
 
         SearchField {
             id: search
@@ -27,9 +27,9 @@ Item {
         ListView {
             id: categories
             Layout.fillWidth: true
-            Layout.preferredHeight: Theme.fontSize(44)
+            Layout.preferredHeight: Theme.layoutSize(44)
             orientation: ListView.Horizontal
-            spacing: Theme.fontSize(5)
+            spacing: Theme.layoutSize(5)
             clip: true
             model: view.controller.emojiModel.categories
             boundsBehavior: Flickable.StopAtBounds
@@ -44,6 +44,8 @@ Item {
                 categoryName: modelData
                 selected: view.controller.emojiModel.category === categoryName
                 focus: ListView.isCurrentItem
+                KeyNavigation.backtab: search
+                KeyNavigation.tab: grid
                 onClicked: {
                     categories.currentIndex = index
                     categories.positionViewAtIndex(index, ListView.Contain)
@@ -54,7 +56,7 @@ Item {
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: Theme.fontSize(20)
+            Layout.preferredHeight: Theme.layoutSize(18)
 
             Text {
                 Layout.fillWidth: true
@@ -76,13 +78,13 @@ Item {
 
         GridView {
             id: grid
-            readonly property int columnCount: Math.max(4, Math.floor(width / Theme.fontSize(56)))
+            readonly property int columnCount: Math.max(4, Math.floor(width / Theme.layoutSize(54)))
 
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
             cellWidth: width / columnCount
-            cellHeight: Theme.fontSize(58)
+            cellHeight: Theme.layoutSize(54)
             model: view.controller.emojiModel
             reuseItems: true
             boundsBehavior: Flickable.StopAtBounds
@@ -90,8 +92,8 @@ Item {
             KeyNavigation.backtab: categories
 
             delegate: EmojiTile {
-                width: grid.cellWidth - Theme.fontSize(4)
-                height: grid.cellHeight - Theme.fontSize(4)
+                width: grid.cellWidth - Theme.layoutSize(4)
+                height: grid.cellHeight - Theme.layoutSize(4)
                 compact: true
                 focus: GridView.isCurrentItem
                 onPicked: symbol => view.controller.copyEmoji(symbol)

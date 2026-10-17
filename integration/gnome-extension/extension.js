@@ -30,6 +30,9 @@ const INTERFACE_XML = `
     </method>
     <method name="ShowEmoji"/>
     <method name="ShowClipboard"/>
+    <method name="PositionPicker">
+      <arg name="pid" type="u" direction="in"/>
+    </method>
     <method name="CancelPaste"/>
     <method name="PasteSelection">
       <arg name="shortcutMode" type="s" direction="in"/>
@@ -63,6 +66,7 @@ export default class EmojiKeyboardExtension extends Extension {
         this._targetWindow = null;
         this._pickerPid = 0;
         this._pasteGeneration = 0;
+        this._positionSource = 0;
         try {
             this._bus = Gio.bus_get_sync(Gio.BusType.SESSION, null);
             this._exported = Gio.DBusExportedObject.wrapJSObject(INTERFACE_XML, this);
@@ -97,6 +101,10 @@ export default class EmojiKeyboardExtension extends Extension {
         this._openClipboardRevision = null;
         this._pickerPid = 0;
         this._keyboard = null;
+        if (this._positionSource) {
+            GLib.source_remove(this._positionSource);
+            this._positionSource = 0;
+        }
         if (this._emojiBindingAdded) {
             Main.wm.removeKeybinding('show-emoji');
             this._emojiBindingAdded = false;
@@ -132,6 +140,59 @@ export default class EmojiKeyboardExtension extends Extension {
 
     ShowClipboard() {
         this._showPicker('ShowClipboard');
+    }
+
+    PositionPicker(pid) {
+        if (!pid)
+            return;
+        if (this._positionSource) {
+            GLib.source_remove(this._positionSource);
+            this._positionSource = 0;
+        }
+        const [pointerX, pointerY] = global.get_pointer();
+        const place = () => {
+            const picker = global.display.list_all_windows().find(window =>
+                window.get_pid() === pid && window.get_title() === 'Emoji Keyboard');
+            if (!picker || !picker.showing_on_its_workspace())
+                return false;
+            const frame = picker.get_frame_rect();
+            if (frame.width <= 0 || frame.height <= 0)
+                return false;
+            let monitor = picker.get_monitor();
+            for (let index = 0; index < global.display.get_n_monitors(); index++) {
+                const geometry = global.display.get_monitor_geometry(index);
+                if (pointerX >= geometry.x && pointerX < geometry.x + geometry.width &&
+                    pointerY >= geometry.y && pointerY < geometry.y + geometry.height) {
+                    monitor = index;
+                    break;
+                }
+            }
+            const area = picker.get_work_area_for_monitor(monitor);
+            const coordinate = (pointer, size, start, length) => {
+                const gap = 12;
+                const margin = length >= size + 16 ? 8 : 0;
+                const minimum = start + margin;
+                const maximum = start + Math.max(0, length - size - margin);
+                let position = pointer + gap;
+                if (position + size > start + length - margin)
+                    position = pointer - size - gap;
+                return Math.max(minimum, Math.min(position, maximum));
+            };
+            picker.move_frame(true,
+                coordinate(pointerX, frame.width, area.x, area.width),
+                coordinate(pointerY, frame.height, area.y, area.height));
+            return true;
+        };
+        if (place())
+            return;
+        let attempts = 0;
+        this._positionSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 30, () => {
+            if (!this._bus || ++attempts >= 30 || place()) {
+                this._positionSource = 0;
+                return GLib.SOURCE_REMOVE;
+            }
+            return GLib.SOURCE_CONTINUE;
+        });
     }
 
     CancelPaste() {

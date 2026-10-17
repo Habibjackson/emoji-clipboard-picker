@@ -55,6 +55,24 @@ def install_test_input(extension: Path) -> None:
         '    </method>\n'
         '    <method name="XDisplay">\n'
         '      <arg name="display" type="s" direction="out"/>\n'
+        '    </method>\n'
+        '    <method name="SetPointer">\n'
+        '      <arg name="x" type="i" direction="in"/>\n'
+        '      <arg name="y" type="i" direction="in"/>\n'
+        '    </method>\n'
+        '    <method name="PointerLocation">\n'
+        '      <arg name="x" type="i" direction="out"/>\n'
+        '      <arg name="y" type="i" direction="out"/>\n'
+        '    </method>\n'
+        '    <method name="NudgePointer">\n'
+        '      <arg name="dx" type="i" direction="in"/>\n'
+        '      <arg name="dy" type="i" direction="in"/>\n'
+        '    </method>\n'
+        '    <method name="PickerFrame">\n'
+        '      <arg name="x" type="i" direction="out"/>\n'
+        '      <arg name="y" type="i" direction="out"/>\n'
+        '      <arg name="width" type="i" direction="out"/>\n'
+        '      <arg name="height" type="i" direction="out"/>\n'
         '    </method>\n' + interface_anchor)
     contents = contents.replace(method_anchor,
         '''    InjectKey(key) {
@@ -80,6 +98,30 @@ def install_test_input(extension: Path) -> None:
 
     XDisplay() {
         return GLib.getenv('DISPLAY') ?? '';
+    }
+
+    SetPointer(x, y) {
+        const seat = Clutter.get_default_backend().get_default_seat();
+        this._testPointer ??= seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+        this._testPointer.notify_absolute_motion(GLib.get_monotonic_time(), x, y);
+    }
+
+    PointerLocation() {
+        const [x, y] = global.get_pointer();
+        return [x, y];
+    }
+
+    NudgePointer(dx, dy) {
+        this._testPointer.notify_relative_motion(GLib.get_monotonic_time(), dx, dy);
+    }
+
+    PickerFrame() {
+        const picker = global.display.list_all_windows().find(window =>
+            window.get_title() === 'Emoji Keyboard' && window.showing_on_its_workspace());
+        if (!picker)
+            return [0, 0, 0, 0];
+        const frame = picker.get_frame_rect();
+        return [frame.x, frame.y, frame.width, frame.height];
     }
 
     InjectShortcut(view) {
@@ -188,6 +230,58 @@ def inject_key(key: int) -> None:
                      "/org/emojikeyboard/ClipboardProbe", str(key))
     if press.returncode:
         raise RuntimeError(f"Could not inject key {key}: {press.stderr.strip()}")
+
+
+def set_pointer(x: int, y: int) -> None:
+    result = bus_call("org.emojikeyboard.ClipboardProbe",
+                      "org.emojikeyboard.ClipboardProbe.SetPointer",
+                      "/org/emojikeyboard/ClipboardProbe", str(x), str(y))
+    if result.returncode:
+        raise RuntimeError(f"Could not move test pointer: {result.stderr.strip()}")
+    deadline = time.monotonic() + 3
+    actual = None
+    while time.monotonic() < deadline:
+        location = bus_call("org.emojikeyboard.ClipboardProbe",
+                            "org.emojikeyboard.ClipboardProbe.PointerLocation",
+                            "/org/emojikeyboard/ClipboardProbe")
+        if location.returncode:
+            raise RuntimeError(f"Could not read test pointer: {location.stderr.strip()}")
+        actual = ast.literal_eval(location.stdout.strip())
+        if actual == (x, y):
+            return
+        nudge = bus_call("org.emojikeyboard.ClipboardProbe",
+                         "org.emojikeyboard.ClipboardProbe.NudgePointer",
+                         "/org/emojikeyboard/ClipboardProbe",
+                         str(x - actual[0]), str(y - actual[1]))
+        if nudge.returncode:
+            raise RuntimeError(f"Could not nudge test pointer: {nudge.stderr.strip()}")
+        time.sleep(0.1)
+    raise RuntimeError(f"Test pointer did not move to ({x}, {y}); actual={actual}")
+
+
+def wait_for_picker_near(x: int, y: int, flip: bool) -> None:
+    deadline = time.monotonic() + 5
+    frame = None
+    while time.monotonic() < deadline:
+        result = bus_call("org.emojikeyboard.ClipboardProbe",
+                          "org.emojikeyboard.ClipboardProbe.PickerFrame",
+                          "/org/emojikeyboard/ClipboardProbe")
+        if result.returncode:
+            raise RuntimeError(f"Could not read picker frame: {result.stderr.strip()}")
+        frame = ast.literal_eval(result.stdout.strip())
+        left, top, width, height = frame
+        expected_x = x - width - 12 if flip else x + 12
+        expected_y = y - height - 12 if flip else y + 12
+        if width > 0 and height > 0 and abs(left - expected_x) <= 12 \
+                and abs(top - expected_y) <= 12 and left >= 0 and top >= 0 \
+                and left + width <= 800 and top + height <= 600:
+            return
+        time.sleep(0.1)
+    pointer = bus_call("org.emojikeyboard.ClipboardProbe",
+                       "org.emojikeyboard.ClipboardProbe.PointerLocation",
+                       "/org/emojikeyboard/ClipboardProbe")
+    raise RuntimeError(f"Picker did not open near ({x}, {y}); frame={frame}; "
+                       f"pointer={pointer.stdout.strip()}")
 
 
 def wait_for_history(test_root: Path, kind: str, minimum: int = 1) -> None:
@@ -316,6 +410,7 @@ def check_child(test_root: Path) -> int:
                 raise RuntimeError("Qt app did not acquire its session D-Bus name")
             print("Qt picker: running on isolated Wayland display")
 
+            set_pointer(80, 80)
             show = call("gdbus", "call", "--session", "--dest",
                         "org.emojikeyboard.ClipboardProbe", "--object-path",
                         "/org/emojikeyboard/ClipboardProbe", "--method",
@@ -327,6 +422,7 @@ def check_child(test_root: Path) -> int:
                            "org.emojikeyboard.App.IsVisible")
             if visible.returncode or "true" not in visible.stdout.lower():
                 raise RuntimeError(f"Picker did not become visible: {visible.stdout.strip()}")
+            wait_for_picker_near(80, 80, flip=False)
             print("Extension to Qt D-Bus activation: passed")
 
             hide = bus_call("org.emojikeyboard.App", "org.emojikeyboard.App.Hide",
@@ -334,6 +430,20 @@ def check_child(test_root: Path) -> int:
             if hide.returncode:
                 raise RuntimeError(f"Could not reset picker: {hide.stderr.strip()}")
             wait_for_view("emoji", visible=False)
+            set_pointer(780, 570)
+            show = bus_call("org.emojikeyboard.App", "org.emojikeyboard.App.ShowClipboard",
+                            "/org/emojikeyboard/App")
+            if show.returncode:
+                raise RuntimeError(f"Could not open picker at screen edge: {show.stderr.strip()}")
+            wait_for_view("clipboard")
+            wait_for_picker_near(780, 570, flip=True)
+            hide = bus_call("org.emojikeyboard.App", "org.emojikeyboard.App.Hide",
+                            "/org/emojikeyboard/App")
+            if hide.returncode:
+                raise RuntimeError(f"Could not reset picker: {hide.stderr.strip()}")
+            wait_for_view("clipboard", visible=False)
+            set_pointer(400, 300)
+            print("GNOME Wayland: picker placed by pointer and flipped at screen edge")
             for view, expected_visible in (("emoji", True), ("clipboard", True),
                                            ("clipboard", False)):
                 inject = bus_call("org.emojikeyboard.ClipboardProbe",
@@ -360,10 +470,19 @@ def check_child(test_root: Path) -> int:
             wait_for_history(test_root, "text")
             inject_shortcut("emoji")
             wait_for_view("emoji")
-            for key in (15, 28):  # Tab to grid, then Enter on its first emoji.
+            for key in (15, 15, 28):  # Search, categories, grid, then first emoji.
                 inject_key(key)
                 time.sleep(0.2)
-            wait_for_file(result_path, "😀")
+            try:
+                wait_for_file(result_path, "😀")
+            except RuntimeError as error:
+                focus = bus_call("org.emojikeyboard.ClipboardProbe",
+                                 "org.emojikeyboard.ClipboardProbe.FocusedTitle",
+                                 "/org/emojikeyboard/ClipboardProbe")
+                status = bus_call("org.emojikeyboard.App", "org.emojikeyboard.App.CurrentStatus",
+                                  "/org/emojikeyboard/App")
+                raise RuntimeError(f"{error}; focus={focus.stdout.strip()}; "
+                                   f"status={status.stdout.strip()}") from error
             wait_for_focus(title)
             time.sleep(1)
             inject_key(19)  # R: read clipboard after the temporary emoji is restored.
@@ -395,7 +514,8 @@ def check_child(test_root: Path) -> int:
 
             result_path.unlink(missing_ok=True)
             time.sleep(0.35)
-            inject_key(15)  # Search to the first history card.
+            inject_key(15)  # Search to Capture current.
+            inject_key(15)  # Capture current to the first history card.
             time.sleep(0.2)
             inject_key(28)
             wait_for_file(result_path, "IMAGE 2x2")
@@ -442,6 +562,7 @@ def check_child(test_root: Path) -> int:
             wait_for_view("emoji")
             time.sleep(0.35)
             inject_key(15)
+            inject_key(15)
             time.sleep(0.2)
             inject_key(28)
             try:
@@ -477,6 +598,7 @@ def check_child(test_root: Path) -> int:
             inject_shortcut("emoji")
             wait_for_view("emoji")
             time.sleep(0.3)
+            inject_key(15)
             inject_key(15)
             time.sleep(0.2)
             inject_key(28)
@@ -533,6 +655,7 @@ def check_child(test_root: Path) -> int:
             inject_shortcut("emoji")
             wait_for_view("emoji")
             time.sleep(0.35)
+            inject_key(15)
             inject_key(15)
             time.sleep(0.2)
             inject_key(28)

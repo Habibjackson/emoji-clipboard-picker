@@ -8,8 +8,8 @@ T.Button {
     property string categoryName: ""
 
     text: categoryName
-    implicitHeight: Math.max(44, Theme.fontSize(40))
-    implicitWidth: Math.max(Theme.fontSize(58), label.implicitWidth + Theme.fontSize(22))
+    implicitHeight: Math.max(44, Theme.layoutSize(40))
+    implicitWidth: Math.max(Theme.layoutSize(58), label.implicitWidth + Theme.layoutSize(22))
     hoverEnabled: true
     Accessible.name: categoryName
     Keys.onReturnPressed: control.clicked()

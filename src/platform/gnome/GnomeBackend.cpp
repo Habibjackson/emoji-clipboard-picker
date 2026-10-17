@@ -2,6 +2,7 @@
 
 #include "app/AppController.h"
 
+#include <QCoreApplication>
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
 #include <QDBusMessage>
@@ -84,7 +85,19 @@ void GnomeBackend::captureClipboardPayload(const QString &kind, const QString &m
 
 void GnomeBackend::openView(const QString &view)
 {
+    const bool opening = m_window && !m_window->isVisible();
     showWindow(view);
+    if (!opening)
+        return;
+    const auto bus = QDBusConnection::sessionBus();
+    if (!bus.isConnected())
+        return;
+    auto message = QDBusMessage::createMethodCall(
+        QStringLiteral("org.emojikeyboard.ClipboardProbe"),
+        QStringLiteral("/org/emojikeyboard/ClipboardProbe"),
+        QStringLiteral("org.emojikeyboard.ClipboardProbe"), QStringLiteral("PositionPicker"));
+    message.setArguments({uint(QCoreApplication::applicationPid())});
+    bus.asyncCall(message);
 }
 
 bool GnomeBackend::rememberTarget()

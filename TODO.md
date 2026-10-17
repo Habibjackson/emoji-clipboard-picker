@@ -58,7 +58,8 @@
 - [x] Use Qt Quick Templates for customized controls, system-aware light/dark colors, scalable typography, and a visible keyboard focus ring. (Type and control sizes follow the application font; a 1.5× type preview was checked.)
 - [x] Support Tab, arrow keys, Enter, and Escape throughout. Ensure every pointer action also works from the keyboard and has an accessible label. (Live X11 keyboard checks copied an emoji and a history card, selected an exact tone with arrows, and closed the tone popup with Escape.)
 - [x] Show useful states for empty recents, no search results, all five pins used, capture paused, missing desktop integration, skipped oversized content, and failed paste. (Oversize and paste failures remain in an attention banner when the picker is reopened.)
-- [x] Keep the picker usable at normal and large desktop font sizes and on smaller displays. Let the compositor place the window on Wayland rather than relying on absolute positioning. (Checked 640×480 and a simulated 1.5× type scale; compact layouts and the action rail scroll, and the window sets no x/y position.)
+- [x] Keep the picker usable at normal and large desktop font sizes and on smaller displays. (Checked 640×480 at 1.5× DPI; a short window combines view tabs and actions in one row, leaving two emoji rows visible.)
+- [x] Open beside the mouse pointer inside the current monitor's work area. (Qt positions the X11 window; the GNOME Shell extension moves the Wayland window after it appears. Isolated X11 and GNOME edge tests pass.)
 
 ## 6. Finish Wayland and X11 paste flows
 

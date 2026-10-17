@@ -326,7 +326,7 @@ def install(paths: dict[str, Path], state: dict, binary: Path, no_shortcuts: boo
     if is_gnome_session():
         enable_discovered_extension()
         ensure_extension_enabled()
-    print("Installed for this user. On GNOME Wayland, log out and log in so Shell discovers a new extension.")
+    print("Installed for this user. On GNOME Wayland, log out and log back in to load new or updated extension code.")
     if not no_shortcuts:
         setup_shortcuts(paths, state)
 
@@ -399,6 +399,7 @@ def uninstall(paths: dict[str, Path], state: dict, purge: bool) -> None:
 
 def status(paths: dict[str, Path], recheck: bool) -> int:
     problems = []
+    current_bridge = None
     x11 = os.environ.get("XDG_SESSION_TYPE") == "x11"
     gnome = is_gnome_session()
     for name in ("bin", "desktop", "dbus", "unit"):
@@ -419,6 +420,17 @@ def status(paths: dict[str, Path], recheck: bool) -> int:
         print(f"GNOME extension: {'active' if active_extension else 'not active'}")
         if not active_extension:
             problems.append("GNOME extension (a new installation may need logout/login)")
+        else:
+            try:
+                bridge = run("gdbus", "introspect", "--session", "--dest",
+                             "org.emojikeyboard.ClipboardProbe", "--object-path",
+                             "/org/emojikeyboard/ClipboardProbe", check=False)
+                current_bridge = bridge.returncode == 0 and "PositionPicker(" in bridge.stdout
+            except FileNotFoundError:
+                pass
+            if current_bridge is False:
+                print("GNOME extension code: previous version still loaded")
+                problems.append("GNOME extension code (log out and log back in)")
     else:
         problems.append("unsupported Wayland compositor")
     active = run("systemctl", "--user", "is-active", "emoji-keyboard.service", check=False)
@@ -443,6 +455,8 @@ def status(paths: dict[str, Path], recheck: bool) -> int:
         if recheck:
             if gnome and not x11 and not active_extension:
                 print("Log out and log back in after installing the extension, then run recheck.")
+            elif current_bridge is False:
+                print("Log out and log back in to load the updated extension, then run recheck.")
             if any(problem.endswith("shortcut") for problem in problems):
                 print("Run setup-shortcuts for known GNOME conflicts; inspect other extensions if keys remain unavailable.")
     else:

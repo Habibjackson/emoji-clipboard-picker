@@ -4,7 +4,7 @@ import QtQuick.Templates as T
 T.TextField {
     id: control
 
-    implicitHeight: Math.max(46, Theme.fontSize(42))
+    implicitHeight: Math.max(46, Theme.layoutSize(42))
     leftPadding: Theme.fontSize(16)
     rightPadding: Theme.fontSize(16)
     color: Theme.ink

@@ -12,7 +12,7 @@ Item {
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: Theme.fontSize(7)
+        spacing: Theme.layoutSize(6)
 
         SearchField {
             id: search
@@ -25,8 +25,8 @@ Item {
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: Theme.fontSize(44)
-            spacing: Theme.fontSize(6)
+            Layout.preferredHeight: Theme.layoutSize(44)
+            spacing: Theme.layoutSize(6)
 
             Text {
                 Layout.fillWidth: true
@@ -75,7 +75,7 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            spacing: Theme.fontSize(5)
+            spacing: Theme.layoutSize(5)
             model: view.controller.clipboardModel
             reuseItems: true
             boundsBehavior: Flickable.StopAtBounds
@@ -86,7 +86,7 @@ Item {
             section.delegate: Text {
                 required property string section
                 width: list.width
-                height: Theme.fontSize(26)
+                height: Theme.layoutSize(26)
                 text: section
                 color: Theme.accent
                 font.family: Theme.bodyFamily

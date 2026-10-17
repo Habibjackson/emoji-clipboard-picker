@@ -19,11 +19,16 @@ QtObject {
                                       ? Math.max(1, Application.font.pointSize / 9)
                                       : Application.font.pixelSize > 0
                                         ? Math.max(1, Application.font.pixelSize / 12) : 1
+    readonly property real layoutScale: Math.min(fontScale, 1.2)
     readonly property int radius: 14
     readonly property int smallRadius: 9
     readonly property int spacing: fontSize(12)
 
     function fontSize(pixels) {
         return Math.round(pixels * fontScale)
+    }
+
+    function layoutSize(pixels) {
+        return Math.round(pixels * layoutScale)
     }
 }

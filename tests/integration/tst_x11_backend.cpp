@@ -4,11 +4,13 @@
 
 #include <QFile>
 #include <QClipboard>
+#include <QCursor>
 #include <QGuiApplication>
 #include <QProcess>
 #include <QQuickWindow>
 #include <QSettings>
 #include <QSignalSpy>
+#include <QScreen>
 #include <QTemporaryDir>
 #include <QTest>
 
@@ -21,6 +23,7 @@ class X11BackendTest final : public QObject
     Q_OBJECT
 
 private slots:
+    void opensNearPointerAndFlipsAtEdges();
     void clipboardShortcutsAndPaste();
     void restoresEmojiClipboardAndCancelsSafely();
 };
@@ -53,6 +56,46 @@ bool hasKind(const HistoryStore &store, const QString &kind)
     }
     return false;
 }
+}
+
+void X11BackendTest::opensNearPointerAndFlipsAtEdges()
+{
+    QTemporaryDir directory;
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QVERIFY(store.open());
+    AppController controller(&store, QStringLiteral("emoji"));
+    QQuickWindow picker;
+    picker.setFlags(Qt::Tool | Qt::FramelessWindowHint);
+    picker.resize(380, 430);
+    X11Backend backend(&picker, &controller);
+    QVERIFY2(backend.isAvailable(), qPrintable(backend.errorString()));
+    QSignalSpy shortcutSpy(&backend, &X11Backend::shortcutTriggered);
+    QVERIFY(shortcutSpy.isValid());
+    Display *display = XOpenDisplay(nullptr);
+    QVERIFY(display);
+    QScreen *screen = QGuiApplication::primaryScreen();
+    QVERIFY(screen);
+    const QRect area = screen->availableGeometry();
+
+    const QPoint upperLeft(area.x() + 80, area.y() + 80);
+    QCursor::setPos(upperLeft);
+    QTRY_COMPARE(QCursor::pos(), upperLeft);
+    sendShortcut(display, XK_period);
+    QTRY_COMPARE_WITH_TIMEOUT(shortcutSpy.size(), 1, 3000);
+    QVERIFY(picker.isVisible());
+    QTRY_COMPARE(picker.position(), upperLeft + QPoint(12, 12));
+
+    picker.hide();
+    const QPoint lowerRight(area.right() - 10, area.bottom() - 10);
+    QCursor::setPos(lowerRight);
+    QTRY_COMPARE(QCursor::pos(), lowerRight);
+    sendShortcut(display, XK_period);
+    QTRY_COMPARE_WITH_TIMEOUT(shortcutSpy.size(), 2, 3000);
+    QVERIFY(picker.isVisible());
+    QTRY_COMPARE(picker.position(),
+                 lowerRight - QPoint(picker.width() + 12, picker.height() + 12));
+    QVERIFY(area.contains(picker.geometry()));
+    XCloseDisplay(display);
 }
 
 void X11BackendTest::clipboardShortcutsAndPaste()

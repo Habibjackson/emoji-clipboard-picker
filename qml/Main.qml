@@ -11,6 +11,7 @@ T.ApplicationWindow {
     property string currentView: controller.initialView
     readonly property int availableWidth: Screen.width > 0 ? Screen.width : 720
     readonly property int availableHeight: Screen.height > 0 ? Screen.height : 520
+    readonly property bool shortHeight: height < Theme.layoutSize(380)
     readonly property string pasteModeLabel: controller.pasteShortcutMode === "ctrl-v"
                                               ? qsTr("Ctrl+V")
                                               : controller.pasteShortcutMode === "ctrl-shift-v"
@@ -19,10 +20,10 @@ T.ApplicationWindow {
     visible: false
     flags: Qt.Tool | Qt.FramelessWindowHint
     color: "transparent"
-    width: Math.min(Theme.fontSize(468), availableWidth - 24)
-    height: Math.min(Theme.fontSize(520), availableHeight - 24)
-    minimumWidth: Math.min(Theme.fontSize(360), availableWidth - 24)
-    minimumHeight: Math.min(Theme.fontSize(420), availableHeight - 24)
+    width: Math.min(Theme.layoutSize(380), availableWidth - 24)
+    height: Math.min(Theme.layoutSize(430), availableHeight - 24)
+    minimumWidth: Math.min(Theme.layoutSize(320), availableWidth - 24)
+    minimumHeight: Math.min(Theme.layoutSize(360), availableHeight - 24)
     title: qsTr("Emoji Keyboard")
     onClosing: function(close) {
         close.accepted = false
@@ -43,17 +44,18 @@ T.ApplicationWindow {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: Theme.fontSize(12)
-        spacing: Theme.fontSize(8)
+        anchors.margins: Theme.layoutSize(10)
+        spacing: Theme.layoutSize(6)
 
         RowLayout {
+            visible: !window.shortHeight
             Layout.fillWidth: true
-            Layout.preferredHeight: Theme.fontSize(44)
-            spacing: Theme.fontSize(9)
+            Layout.preferredHeight: Theme.layoutSize(44)
+            spacing: Theme.layoutSize(7)
 
             Rectangle {
-                Layout.preferredWidth: Theme.fontSize(34)
-                Layout.preferredHeight: Theme.fontSize(34)
+                Layout.preferredWidth: Theme.layoutSize(30)
+                Layout.preferredHeight: Theme.layoutSize(30)
                 radius: Theme.smallRadius
                 color: Theme.accent
 
@@ -77,7 +79,7 @@ T.ApplicationWindow {
             }
 
             ActionButton {
-                Layout.preferredWidth: Theme.fontSize(44)
+                Layout.preferredWidth: Theme.layoutSize(44)
                 text: "⋯"
                 font.pixelSize: Theme.fontSize(20)
                 selected: actionsPopup.visible
@@ -85,7 +87,7 @@ T.ApplicationWindow {
                 onClicked: actionsPopup.open()
             }
             ActionButton {
-                Layout.preferredWidth: Theme.fontSize(44)
+                Layout.preferredWidth: Theme.layoutSize(44)
                 text: "×"
                 font.pixelSize: Theme.fontSize(20)
                 accessibilityLabel: qsTr("Hide picker")
@@ -95,14 +97,14 @@ T.ApplicationWindow {
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: Theme.fontSize(48)
+            Layout.preferredHeight: Theme.layoutSize(44)
             radius: Theme.smallRadius
             color: Theme.rail
 
             RowLayout {
                 anchors.fill: parent
-                anchors.margins: Theme.fontSize(2)
-                spacing: Theme.fontSize(3)
+                anchors.margins: Theme.layoutSize(2)
+                spacing: Theme.layoutSize(3)
 
                 ActionButton {
                     Layout.fillWidth: true
@@ -117,6 +119,25 @@ T.ApplicationWindow {
                     text: qsTr("Clipboard")
                     selected: window.currentView === "clipboard"
                     onClicked: window.currentView = "clipboard"
+                }
+                ActionButton {
+                    visible: window.shortHeight
+                    Layout.preferredWidth: Theme.layoutSize(44)
+                    Layout.fillHeight: true
+                    text: "⋯"
+                    font.pixelSize: Theme.fontSize(20)
+                    selected: actionsPopup.visible
+                    accessibilityLabel: qsTr("History actions")
+                    onClicked: actionsPopup.open()
+                }
+                ActionButton {
+                    visible: window.shortHeight
+                    Layout.preferredWidth: Theme.layoutSize(44)
+                    Layout.fillHeight: true
+                    text: "×"
+                    font.pixelSize: Theme.fontSize(20)
+                    accessibilityLabel: qsTr("Hide picker")
+                    onClicked: window.hide()
                 }
             }
         }
@@ -181,9 +202,10 @@ T.ApplicationWindow {
         }
 
         RowLayout {
+            visible: !window.shortHeight
             Layout.fillWidth: true
-            Layout.preferredHeight: Theme.fontSize(22)
-            spacing: Theme.fontSize(8)
+            Layout.preferredHeight: Theme.layoutSize(20)
+            spacing: Theme.layoutSize(8)
 
             Text {
                 Layout.fillWidth: true
@@ -217,7 +239,7 @@ T.ApplicationWindow {
         id: actionsPopup
         parent: window.contentItem
         x: window.width - width - Theme.fontSize(12)
-        y: Theme.fontSize(58)
+        y: window.shortHeight ? Theme.layoutSize(54) : Theme.fontSize(58)
         width: Math.min(Theme.fontSize(232), window.width - Theme.fontSize(24))
         height: actionsContent.implicitHeight + topPadding + bottomPadding
         padding: Theme.fontSize(8)
@@ -287,7 +309,7 @@ T.ApplicationWindow {
         id: pasteShortcutPopup
         parent: window.contentItem
         x: window.width - width - Theme.fontSize(12)
-        y: Theme.fontSize(58)
+        y: window.shortHeight ? Theme.layoutSize(54) : Theme.fontSize(58)
         width: Math.min(Theme.fontSize(208), window.width - Theme.fontSize(24))
         height: pasteChoices.implicitHeight + topPadding + bottomPadding
         padding: Theme.fontSize(8)

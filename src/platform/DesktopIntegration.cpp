@@ -2,10 +2,28 @@
 
 #include "app/AppController.h"
 
+#include <QCursor>
 #include <QGuiApplication>
 #include <QQuickWindow>
+#include <QScreen>
 
+#include <algorithm>
 #include <utility>
+
+namespace {
+int popupCoordinate(int pointer, int extent, int areaStart, int areaExtent)
+{
+    constexpr int gap = 12;
+    constexpr int margin = 8;
+    const int edge = areaExtent >= extent + 2 * margin ? margin : 0;
+    const int minimum = areaStart + edge;
+    const int maximum = areaStart + std::max(0, areaExtent - extent - edge);
+    int position = pointer + gap;
+    if (position + extent > areaStart + areaExtent - edge)
+        position = pointer - extent - gap;
+    return std::clamp(position, minimum, maximum);
+}
+}
 
 DesktopIntegration::DesktopIntegration(QQuickWindow *window, AppController *controller,
                                        QObject *parent)
@@ -29,6 +47,19 @@ void DesktopIntegration::showWindow(const QString &view)
     if (!m_window)
         return;
     m_window->setProperty("currentView", view);
+    if (!m_window->isVisible() && QGuiApplication::platformName() == QStringLiteral("xcb")) {
+        const QPoint pointer = QCursor::pos();
+        QScreen *screen = QGuiApplication::screenAt(pointer);
+        if (!screen)
+            screen = m_window->screen() ? m_window->screen() : QGuiApplication::primaryScreen();
+        if (screen) {
+            const QRect area = screen->availableGeometry();
+            m_window->setPosition(popupCoordinate(pointer.x(), m_window->width(),
+                                                  area.x(), area.width()),
+                                  popupCoordinate(pointer.y(), m_window->height(),
+                                                  area.y(), area.height()));
+        }
+    }
     m_window->show();
     if (QGuiApplication::platformName() == QStringLiteral("xcb"))
         m_window->raise();

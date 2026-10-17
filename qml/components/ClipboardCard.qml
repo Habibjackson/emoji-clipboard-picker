@@ -17,8 +17,8 @@ T.Control {
     signal pinRequested(bool pinned)
     signal deleteRequested()
 
-    implicitHeight: Theme.fontSize(kind === "image" ? 78 : 70)
-    padding: Theme.fontSize(8)
+    implicitHeight: Theme.layoutSize(kind === "image" ? 78 : 70)
+    padding: Theme.layoutSize(8)
     hoverEnabled: true
     activeFocusOnTab: true
     Accessible.role: Accessible.Button
@@ -35,7 +35,7 @@ T.Control {
     }
 
     contentItem: RowLayout {
-        spacing: Theme.fontSize(5)
+        spacing: Theme.layoutSize(5)
 
         Item {
             Layout.fillWidth: true
@@ -43,10 +43,10 @@ T.Control {
 
             RowLayout {
                 anchors.fill: parent
-                spacing: Theme.fontSize(8)
+                spacing: Theme.layoutSize(8)
 
                 Rectangle {
-                    Layout.preferredWidth: Theme.fontSize(54)
+                    Layout.preferredWidth: Theme.layoutSize(54)
                     Layout.fillHeight: true
                     visible: card.kind === "image"
                     radius: Theme.smallRadius
@@ -54,7 +54,7 @@ T.Control {
 
                     Image {
                         anchors.fill: parent
-                        anchors.margins: Theme.fontSize(4)
+                        anchors.margins: Theme.layoutSize(4)
                         source: card.imageSource
                         sourceSize.width: 108
                         sourceSize.height: 108
@@ -67,7 +67,7 @@ T.Control {
                 ColumnLayout {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    spacing: Theme.fontSize(2)
+                    spacing: Theme.layoutSize(2)
 
                     Text {
                         Layout.fillWidth: true
@@ -100,8 +100,8 @@ T.Control {
         }
 
         ActionButton {
-            Layout.preferredWidth: Theme.fontSize(card.pinned ? 57 : 45)
-            Layout.preferredHeight: Theme.fontSize(44)
+            Layout.preferredWidth: Theme.layoutSize(card.pinned ? 57 : 45)
+            Layout.preferredHeight: Theme.layoutSize(44)
             dense: true
             text: card.pinned ? qsTr("Unpin") : qsTr("Pin")
             enabled: card.pinned || card.canPin
@@ -111,8 +111,8 @@ T.Control {
             onClicked: card.pinRequested(!card.pinned)
         }
         ActionButton {
-            Layout.preferredWidth: Theme.fontSize(54)
-            Layout.preferredHeight: Theme.fontSize(44)
+            Layout.preferredWidth: Theme.layoutSize(54)
+            Layout.preferredHeight: Theme.layoutSize(44)
             dense: true
             text: qsTr("Delete")
             accessibilityLabel: qsTr("Delete item")
