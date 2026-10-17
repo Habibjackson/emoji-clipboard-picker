@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Templates as T
 
 Item {
     id: view
@@ -28,7 +29,7 @@ Item {
                 font.weight: Font.Bold
             }
             Text {
-                text: qsTr("Choose an emoji to copy, then paste it where you need it.")
+                text: qsTr("Choose an emoji to copy. Tiles marked ▾ offer skin tones.")
                 color: Theme.muted
                 font.family: Theme.bodyFamily
                 font.pixelSize: 13
@@ -38,21 +39,21 @@ Item {
         SearchField {
             id: search
             Layout.fillWidth: true
-            placeholderText: qsTr("Search emoji by name")
+            placeholderText: qsTr("Search emoji by name or keyword")
             onTextChanged: view.controller.emojiModel.query = text
         }
 
         RowLayout {
             Layout.fillWidth: true
             Text {
-                text: qsTr("%1 emoji").arg(view.controller.emojiModel.resultCount)
+                text: qsTr("%1 choices").arg(view.controller.emojiModel.resultCount)
                 color: Theme.muted
                 font.family: Theme.bodyFamily
                 font.pixelSize: 12
             }
             Item { Layout.fillWidth: true }
             Text {
-                text: qsTr("CLICK TO COPY")
+                text: qsTr("PICK · ▾ FOR TONES")
                 color: Theme.accent
                 font.family: Theme.bodyFamily
                 font.pixelSize: 10
@@ -76,6 +77,11 @@ Item {
                 width: grid.cellWidth - 8
                 height: grid.cellHeight - 8
                 onPicked: symbol => view.controller.copyEmoji(symbol)
+                onVariantsRequested: (symbol, emojiName) => {
+                    variantPopup.baseName = emojiName
+                    variantPopup.choices = view.controller.emojiModel.variantsFor(symbol)
+                    variantPopup.open()
+                }
             }
 
             Text {
@@ -90,6 +96,86 @@ Item {
                 font.pixelSize: 14
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap
+            }
+        }
+    }
+
+    T.Popup {
+        id: variantPopup
+        parent: view
+        property string baseName
+        property var choices: []
+
+        x: (view.width - width) / 2
+        y: (view.height - height) / 2
+        width: Math.min(view.width - 24, 360)
+        height: Math.min(view.height - 24, Math.ceil(choices.length / 4) * 80 + 96)
+        padding: 16
+        modal: true
+        focus: true
+        closePolicy: T.Popup.CloseOnEscape | T.Popup.CloseOnPressOutside
+        onOpened: variantGrid.forceActiveFocus()
+
+        background: Rectangle {
+            radius: Theme.radius
+            color: Theme.surface
+            border.color: Theme.line
+            border.width: 1
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 10
+            Text {
+                Layout.fillWidth: true
+                text: qsTr("Choose a skin tone")
+                color: Theme.ink
+                font.family: Theme.bodyFamily
+                font.pixelSize: 18
+                font.weight: Font.Bold
+            }
+            Text {
+                Layout.fillWidth: true
+                text: variantPopup.baseName
+                color: Theme.muted
+                font.family: Theme.bodyFamily
+                font.pixelSize: 12
+                elide: Text.ElideRight
+            }
+            GridView {
+                id: variantGrid
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                model: variantPopup.choices
+                cellWidth: 80
+                cellHeight: 80
+                clip: true
+                reuseItems: true
+                boundsBehavior: Flickable.StopAtBounds
+                Keys.onReturnPressed: {
+                    if (currentIndex >= 0) {
+                        variantPopup.close()
+                        view.controller.copyEmoji(variantPopup.choices[currentIndex].symbol)
+                    }
+                }
+                Keys.onSpacePressed: {
+                    if (currentIndex >= 0) {
+                        variantPopup.close()
+                        view.controller.copyEmoji(variantPopup.choices[currentIndex].symbol)
+                    }
+                }
+                delegate: EmojiTile {
+                    required property var modelData
+                    width: variantGrid.cellWidth - 8
+                    height: variantGrid.cellHeight - 8
+                    symbol: modelData.symbol
+                    emojiName: modelData.emojiName
+                    variantCount: 0
+                    renderable: modelData.renderable
+                    onPicked: symbol => {
+                        variantPopup.close()
+                        view.controller.copyEmoji(symbol)
+                    }
+                }
             }
         }
     }

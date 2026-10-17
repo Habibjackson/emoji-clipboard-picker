@@ -131,8 +131,9 @@ if(BUILD_TESTING)
         FILES resources/emoji/emoji-test.txt resources/emoji/cldr-en-48.2.tsv
     )
     target_include_directories(tst_emoji_model PRIVATE src)
-    target_link_libraries(tst_emoji_model PRIVATE Qt6::Qml Qt6::Test)
+    target_link_libraries(tst_emoji_model PRIVATE Qt6::Gui Qt6::Qml Qt6::Test)
     add_test(NAME emoji_model COMMAND tst_emoji_model)
+    set_tests_properties(emoji_model PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
     qt_add_executable(tst_app_controller
         tests/integration/tst_app_controller.cpp

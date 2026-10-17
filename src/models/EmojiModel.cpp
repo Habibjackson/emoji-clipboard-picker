@@ -1,8 +1,13 @@
 #include "EmojiModel.h"
 
 #include <QFile>
+#include <QGuiApplication>
+#include <QGlyphRun>
 #include <QRegularExpression>
+#include <QSet>
 #include <QTextStream>
+#include <QTextLayout>
+#include <QVariantMap>
 
 #include <utility>
 
@@ -20,18 +25,25 @@ QVariant EmojiModel::data(const QModelIndex &index, int role) const
 {
     if (!index.isValid() || index.row() < 0 || index.row() >= m_visible.size())
         return {};
-    const Emoji &emoji = m_catalog.at(m_visible.at(index.row()));
+    const int catalogIndex = m_visible.at(index.row());
+    const Emoji &emoji = m_catalog.at(catalogIndex);
     switch (role) {
     case SymbolRole: return emoji.symbol;
     case NameRole: return emoji.name;
     case GroupRole: return emoji.group;
+    case VariantCountRole:
+        return m_category == QStringLiteral("Recent") && m_query.isEmpty()
+            ? 0 : m_variantsByBase.value(catalogIndex).size();
+    case RenderableRole: return canRender(catalogIndex);
     default: return {};
     }
 }
 
 QHash<int, QByteArray> EmojiModel::roleNames() const
 {
-    return { { SymbolRole, "symbol" }, { NameRole, "emojiName" }, { GroupRole, "groupName" } };
+    return { { SymbolRole, "symbol" }, { NameRole, "emojiName" },
+             { GroupRole, "groupName" }, { VariantCountRole, "variantCount" },
+             { RenderableRole, "renderable" } };
 }
 
 bool EmojiModel::load(const QString &resourcePath)
@@ -60,8 +72,14 @@ bool EmojiModel::load(const QString &resourcePath)
     beginResetModel();
     m_catalog.clear();
     m_visible.clear();
+    m_baseForIndex.clear();
+    m_variantsByBase.clear();
+    m_renderableCache.clear();
     m_indexBySymbol.clear();
     m_categories = { QStringLiteral("All"), QStringLiteral("Recent") };
+    QVector<QString> unicodeNames;
+    QVector<QString> baseKeys;
+    QVector<bool> hasSkinTone;
     QString group;
     QString subgroup;
     static const QRegularExpression namePattern(QStringLiteral("^\\S+\\s+E[0-9.]+\\s+(.+)$"));
@@ -86,6 +104,8 @@ bool EmojiModel::load(const QString &resourcePath)
         if (separator < 0 || comment < 0)
             continue;
         QString symbol;
+        QStringList basePoints;
+        bool toned = false;
         bool valid = true;
         const QStringList codePoints = line.left(separator).trimmed().split(QLatin1Char(' '), Qt::SkipEmptyParts);
         for (const QString &hex : codePoints) {
@@ -96,6 +116,10 @@ bool EmojiModel::load(const QString &resourcePath)
                 break;
             }
             symbol += QString::fromUcs4(&point, 1);
+            if (point >= 0x1F3FB && point <= 0x1F3FF)
+                toned = true;
+            else if (point != 0xFE0F)
+                basePoints.append(hex);
         }
         if (!valid || symbol.isEmpty())
             continue;
@@ -114,6 +138,33 @@ bool EmojiModel::load(const QString &resourcePath)
         Emoji emoji { symbol, name, group, std::move(searchable) };
         m_indexBySymbol.insert(symbol, m_catalog.size());
         m_catalog.append(std::move(emoji));
+        unicodeNames.append(unicodeName);
+        baseKeys.append(basePoints.join(QLatin1Char(' ')));
+        hasSkinTone.append(toned);
+    }
+
+    QHash<QString, int> baseByKey;
+    QHash<QString, int> baseByName;
+    m_baseForIndex.resize(m_catalog.size());
+    for (int i = 0; i < m_catalog.size(); ++i) {
+        m_baseForIndex[i] = i;
+        if (!hasSkinTone.at(i)) {
+            baseByKey.insert(baseKeys.at(i), i);
+            baseByName.insert(unicodeNames.at(i), i);
+        }
+    }
+    for (int i = 0; i < m_catalog.size(); ++i) {
+        if (!hasSkinTone.at(i))
+            continue;
+        int base = baseByKey.value(baseKeys.at(i), -1);
+        if (base < 0) {
+            // Some mixed-tone sequences use different code points from their base emoji.
+            base = baseByName.value(unicodeNames.at(i).section(QLatin1Char(':'), 0, 0), -1);
+        }
+        if (base >= 0) {
+            m_baseForIndex[i] = base;
+            m_variantsByBase[base].append(i);
+        }
     }
     endResetModel();
     m_error.clear();
@@ -171,16 +222,69 @@ void EmojiModel::setRecent(const QStringList &symbols)
         rebuild();
 }
 
+QVariantList EmojiModel::variantsFor(const QString &symbol) const
+{
+    const int index = m_indexBySymbol.value(symbol, -1);
+    if (index < 0)
+        return {};
+    const int base = m_baseForIndex.at(index);
+    QVariantList variants;
+    const auto append = [this, &variants](int catalogIndex) {
+        const Emoji &emoji = m_catalog.at(catalogIndex);
+        variants.append(QVariantMap { { QStringLiteral("symbol"), emoji.symbol },
+                                      { QStringLiteral("emojiName"), emoji.name },
+                                      { QStringLiteral("renderable"), canRender(catalogIndex) } });
+    };
+    append(base);
+    for (const int variant : m_variantsByBase.value(base))
+        append(variant);
+    return variants;
+}
+
+bool EmojiModel::canRender(int catalogIndex) const
+{
+    const auto found = m_renderableCache.constFind(catalogIndex);
+    if (found != m_renderableCache.cend())
+        return *found;
+
+    const QString &symbol = m_catalog.at(catalogIndex).symbol;
+    QFont font = QGuiApplication::font();
+    font.setPixelSize(29);
+    QTextLayout layout(symbol, font);
+    layout.beginLayout();
+    layout.createLine();
+    layout.endLayout();
+
+    int glyphCount = 0;
+    bool complete = true;
+    for (const QGlyphRun &run : layout.glyphRuns(0, symbol.size(),
+                                               QTextLayout::RetrieveGlyphIndexes)) {
+        for (quint32 glyph : run.glyphIndexes()) {
+            ++glyphCount;
+            if (glyph == 0)
+                complete = false;
+        }
+    }
+    const bool renderable = complete && glyphCount == 1;
+    m_renderableCache.insert(catalogIndex, renderable);
+    return renderable;
+}
+
 void EmojiModel::rebuild()
 {
     beginResetModel();
     m_visible.clear();
     const QString search = m_query.trimmed();
     if (!search.isEmpty()) {
+        QSet<int> seen;
         for (int i = 0; i < m_catalog.size(); ++i) {
             if (m_catalog.at(i).searchable.contains(search, Qt::CaseInsensitive)
                 || m_catalog.at(i).symbol == search) {
-                m_visible.append(i);
+                const int base = m_baseForIndex.at(i);
+                if (!seen.contains(base)) {
+                    seen.insert(base);
+                    m_visible.append(base);
+                }
             }
         }
     } else if (m_category == QStringLiteral("Recent")) {
@@ -191,8 +295,10 @@ void EmojiModel::rebuild()
         }
     } else {
         for (int i = 0; i < m_catalog.size(); ++i) {
-            if (m_category == QStringLiteral("All") || m_catalog.at(i).group == m_category)
+            if (m_baseForIndex.at(i) == i
+                && (m_category == QStringLiteral("All") || m_catalog.at(i).group == m_category)) {
                 m_visible.append(i);
+            }
         }
     }
     endResetModel();

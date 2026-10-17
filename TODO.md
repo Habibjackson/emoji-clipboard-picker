@@ -34,9 +34,9 @@
 - [x] Import a pinned Unicode emoji data release containing fully qualified sequences, group/subgroup order, and names; document its version and license.
 - [x] Add English names and searchable keywords from a compatible CLDR release, falling back to the Unicode name when an annotation is unavailable. (Pinned CLDR 48.2 covers 3,944 catalog entries; the 19 newer Emoji 18.0 entries use their Unicode names.)
 - [x] Expose categories, emoji items, filtered search results, and recently used emoji through C++ models. Keep the exact selected skin-tone sequence in recents.
-- [ ] Group skin-tone variants behind a variant chooser so the category grid remains usable.
+- [x] Group skin-tone variants behind a variant chooser so the category grid remains usable. (The full grid shows 1,923 base choices; a focused popup offers the 2,040 tone sequences, including mixed tones. Recents preserve exact selections.)
 - [x] Limit emoji recents to the 24 most recently selected sequences; update an existing sequence instead of duplicating it.
-- [ ] Use the system emoji font with a readable name/placeholder for any sequence the installed font cannot render.
+- [x] Use the system emoji font with a readable name/placeholder for any sequence the installed font cannot render. (Qt chooses the system emoji fallback; glyph shaping is checked on demand and missing sequences show a named placeholder.)
 
 ## 4. Implement persistent clipboard history
 

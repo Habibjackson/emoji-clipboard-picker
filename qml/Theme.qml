@@ -15,7 +15,6 @@ QtObject {
     readonly property color accentSoft: dark ? "#49332F" : "#F9E7E1"
     readonly property color accentInk: dark ? "#201B19" : "#FFFFFF"
     readonly property string bodyFamily: "Noto Sans"
-    readonly property string emojiFamily: "Noto Color Emoji"
     readonly property int radius: 14
     readonly property int smallRadius: 9
     readonly property int spacing: 12

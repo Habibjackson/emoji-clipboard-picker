@@ -17,7 +17,8 @@ class EmojiModel : public QAbstractListModel
     Q_PROPERTY(int resultCount READ resultCount NOTIFY resultCountChanged)
 
 public:
-    enum Role { SymbolRole = Qt::UserRole + 1, NameRole, GroupRole };
+    enum Role { SymbolRole = Qt::UserRole + 1, NameRole, GroupRole,
+                VariantCountRole, RenderableRole };
 
     explicit EmojiModel(QObject *parent = nullptr);
     int rowCount(const QModelIndex &parent = {}) const override;
@@ -33,6 +34,7 @@ public:
     void setQuery(const QString &query);
     int resultCount() const;
     void setRecent(const QStringList &symbols);
+    Q_INVOKABLE QVariantList variantsFor(const QString &symbol) const;
 
 signals:
     void categoryChanged();
@@ -48,9 +50,13 @@ private:
     };
 
     void rebuild();
+    bool canRender(int catalogIndex) const;
 
     QVector<Emoji> m_catalog;
     QVector<int> m_visible;
+    QVector<int> m_baseForIndex;
+    QHash<int, QVector<int>> m_variantsByBase;
+    mutable QHash<int, bool> m_renderableCache;
     QHash<QString, int> m_indexBySymbol;
     QStringList m_categories { QStringLiteral("All"), QStringLiteral("Recent") };
     QStringList m_recent;

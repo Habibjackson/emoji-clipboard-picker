@@ -26,7 +26,7 @@ void AppControllerTest::capturesAndCopies()
     QVERIFY2(store.open(), qPrintable(store.errorString()));
     QGuiApplication::clipboard()->clear();
     AppController controller(&store, QStringLiteral("emoji"));
-    QVERIFY(controller.emojiModel()->resultCount() > 3000);
+    QVERIFY(controller.emojiModel()->resultCount() > 1900);
     QVERIFY(controller.emojiModel()->categories().contains(QStringLiteral("Smileys & Emotion")));
     controller.emojiModel()->setQuery(QStringLiteral("grinning face"));
     QVERIFY(controller.emojiModel()->resultCount() > 0);
