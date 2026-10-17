@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Emoji Keyboard
+GenericName=Emoji and Clipboard Picker
+Comment=Find emoji and paste from local clipboard history
+Exec=emoji-keyboard
+Icon=org.emojikeyboard.App
+Terminal=false
+Categories=Utility;
+StartupWMClass=EmojiKeyboard

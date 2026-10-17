@@ -14,6 +14,8 @@ cmake --build build --target emoji-keyboard_qmllint
 ./build/emoji-keyboard
 ```
 
+The X11 backend is built when the X11, XFixes, XTest, Xi, and Xext development files are available. If CMake reports that it is disabled, install those development packages and reconfigure the same `build/` directory.
+
 Run `./build/emoji-keyboard --clipboard` to open the history view directly. The picker runs as one resident process: later launches reopen the existing window, `Escape` hides it, and `Ctrl+Q` or `./build/emoji-keyboard --quit` exits. Use `--background` to start it hidden. `Ctrl+1` and `Ctrl+2` switch views; `Ctrl+F` focuses search. A manual launch copies the selected emoji or saved item for you to paste. You can pin, unpin, delete, clear unpinned history, or pause capture in the clipboard view.
 
 On Linux, the app defaults to Qt's generic platform theme because its custom QML controls do not use GTK styling. This avoids a GTK/GSettings startup crash when launched from some Snap-hosted IDE terminals. An explicit `QT_QPA_PLATFORMTHEME` value still takes precedence.
@@ -21,6 +23,10 @@ On Linux, the app defaults to Qt's generic platform theme because its custom QML
 Clipboard monitoring uses Qt's clipboard notifications while the application runs. GNOME Wayland may not expose copies made while this window is unfocused; use **Capture current** after returning to the picker to save the current clipboard item. A GNOME Shell 50 development extension in [`integration/gnome-extension/`](integration/gnome-extension/README.md) detects clipboard owner changes, starts the hidden picker through session D-Bus, and registers `Super+.` / `Super+V` bindings. When opened by a registered shortcut, the picker returns focus to the prior window and sends `Ctrl+V`, or `Ctrl+Shift+V` for recognized terminals. The bindings default to disabled until guided setup can release existing GNOME shortcuts. No shortcut settings are changed by this version.
 
 After an automatic emoji paste, the GNOME extension restores prior plain text or PNG clipboard content after 750 ms if the temporary emoji is still current and no clipboard owner change was observed. A newer copy is left untouched, even if it contains the same emoji. Unsupported, oversized, or unreadable prior content cannot be restored; the emoji then stays copied. Some applications may read the clipboard later than the delay and receive the restored prior content. The extension cannot confirm that every target accepted the paste. The development bridge does not yet capture full clipboard payloads in the background.
+
+On X11, the optional backend watches clipboard ownership through XFixes and grabs `Super+.` and `Super+V` to open the matching view. It sends `Ctrl+V` to ordinary windows and `Ctrl+Shift+V` to recognized terminals through XTest after a selection. A failed shortcut grab appears in the picker status. X11 emoji paste currently leaves the emoji on the clipboard; restoring the prior content remains a TODO item. The Xvfb integration test covers clipboard text and images, both shortcuts, and text, image, and terminal paste.
+
+The app uses the desktop ID `org.emojikeyboard.App`. `cmake --install build --prefix "$HOME/.local"` installs its launcher and icon with the binary; setup of the GNOME extension and background service is tracked separately in [TODO.md](TODO.md).
 
 History is stored in SQLite under Qt's user-specific `AppDataLocation` with a private directory and database file. Text is capped at 1 MiB and encoded images at 10 MiB. File copy operations and recognized secret-marked content are skipped. The application makes no network requests.
 

@@ -16,31 +16,35 @@ PickerService::PickerService(QQuickWindow *window, AppController *controller, QO
     , m_window(window)
     , m_controller(controller)
 {
-    connect(m_controller, &AppController::itemCopied, this, [this] {
-        if (!m_shortcutTargetArmed) {
-            if (m_controller)
-                m_controller->discardEmojiClipboardSnapshot();
-            return;
-        }
-        m_shortcutTargetArmed = false;
-        const bool emoji = m_controller && m_controller->hasEmojiClipboardSnapshot();
-        const quint64 generation = m_controller
-            ? m_controller->emojiClipboardSnapshotGeneration() : 0;
-        QTimer::singleShot(0, this, [this, emoji, generation] {
-            pasteSelection(emoji, generation);
+    if (QGuiApplication::platformName() != QStringLiteral("xcb")) {
+        connect(m_controller, &AppController::itemCopied, this, [this] {
+            if (!m_shortcutTargetArmed) {
+                if (m_controller)
+                    m_controller->discardEmojiClipboardSnapshot();
+                return;
+            }
+            m_shortcutTargetArmed = false;
+            const bool emoji = m_controller && m_controller->hasEmojiClipboardSnapshot();
+            const quint64 generation = m_controller
+                ? m_controller->emojiClipboardSnapshotGeneration() : 0;
+            QTimer::singleShot(0, this, [this, emoji, generation] {
+                pasteSelection(emoji, generation);
+            });
         });
-    });
+    }
 }
 
 void PickerService::ShowEmoji()
 {
     m_shortcutTargetArmed = false;
+    emit manualActivation();
     showView(QStringLiteral("emoji"));
 }
 
 void PickerService::ShowClipboard()
 {
     m_shortcutTargetArmed = false;
+    emit manualActivation();
     showView(QStringLiteral("clipboard"));
 }
 

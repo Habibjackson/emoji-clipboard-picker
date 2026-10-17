@@ -27,6 +27,9 @@ public slots:
     Q_SCRIPTABLE QString CurrentStatus() const;
     Q_SCRIPTABLE bool IsVisible() const;
 
+signals:
+    void manualActivation();
+
 private:
     void showView(const QString &view);
     void pasteSelection(bool emoji, quint64 snapshotGeneration);

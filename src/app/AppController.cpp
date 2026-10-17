@@ -166,6 +166,11 @@ void AppController::reportPasteResult(const QString &result, const QString &shor
     }
 }
 
+void AppController::reportShortcutFailure(const QString &shortcut)
+{
+    setStatus(tr("%1 is unavailable because another application owns the shortcut.").arg(shortcut));
+}
+
 void AppController::reportClipboardRestoreResult(ClipboardRestoreResult result)
 {
     if (result == ClipboardRestoreResult::Restored)

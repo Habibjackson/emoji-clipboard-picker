@@ -17,16 +17,16 @@
 - [x] Prove `Super+.` and `Super+V` can be registered after the existing IBus emoji and GNOME message-tray bindings are released. (Both opened the correct Qt view from a focused GTK window in an isolated GNOME 50.1 session; extension defaults remain disabled until guided setup.)
 - [x] Prove the extension can remember the focused window, show a Qt window, restore the target window, and send the appropriate paste shortcut. Test a normal text field and a terminal. (GNOME 50.1: GTK 4 entry received `Ctrl+V`; a VTE terminal with `org.gnome.Ptyxis` app ID received `Ctrl+Shift+V` in the isolated session.)
 - [x] Test temporary emoji clipboard replacement followed by restoration of prior text and image content. Never restore over a newer copy made by the user; record cases where restoration cannot be guaranteed. (GNOME 50.1: prior UTF-8 text and PNG image were restored by Shell; newer copies with different and identical emoji content were kept. Restore is skipped if the prior format cannot be read, a clipboard owner change is observed, or the current clipboard no longer contains the temporary emoji. Paste acceptance cannot be confirmed for every target; the 750 ms wait is a best-effort interval.)
-- [ ] Prove X11 clipboard change monitoring through XFixes and global shortcut/paste behavior through X11 key grabs and XTest.
+- [x] Prove X11 clipboard change monitoring through XFixes and global shortcut/paste behavior through X11 key grabs and XTest. (Automated Xvfb test uses a separate Qt target process: text/image clipboard owner changes, both Super shortcuts, ordinary Ctrl+V paste, and terminal Ctrl+Shift+V paste pass.)
 - [x] Record the tested GNOME Shell versions and any version-specific API branches. Test GNOME 50 on the current machine first. (GNOME Shell 50.1 tested; the extension currently targets only version 50 and has no version branches.)
 
 ## 2. Create the Qt application foundation
 
-- [x] Add a CMake project pinned to Qt 6.11 components: Core, Gui, Quick, QuickControls2, Qml, Sql, and DBus. Add X11/XFixes/XTest dependencies only for the X11 backend. (The X11 backend has not been added yet.)
+- [x] Add a CMake project pinned to Qt 6.11 components: Core, Gui, Quick, QuickControls2, Qml, Sql, and DBus. Add X11/XFixes/XTest dependencies only for the optional X11 backend.
 - [x] Create one resident process with a single-instance D-Bus name, a hidden-by-default QML picker, and a command-line option to open either view for debugging.
 - [x] Register C++ models and controllers as a QML module with `qt_add_qml_module`; expose typed properties and invokable actions rather than placing storage logic in QML JavaScript.
 - [ ] Define one desktop integration interface used by the GNOME Wayland and X11 implementations: capture clipboard content, open a view, remember the target, paste a selection, and report failures.
-- [ ] Add a stable desktop-file ID and app icon so GNOME can identify and activate the Qt window.
+- [x] Add a stable desktop-file ID and app icon so GNOME can identify and activate the Qt window. (`org.emojikeyboard.App` is set at startup; CMake installs its desktop entry and icon.)
 - [ ] Make backend or extension failure visible in the picker, with a copy-only fallback for a selected item.
 
 ## 3. Build the emoji catalog and recents
@@ -84,7 +84,7 @@
 - [ ] Test 6th pin rejection; 21st unpinned eviction; recopy of pinned and unpinned entries; unpin at capacity; deletion; clear recent; pause/resume; and persistence after app restart and logout/login.
 - [ ] Test UTF-8 text, multiline text, duplicate text, PNG/JPEG images, unsupported file-copy MIME types, oversized content, and corrupted or outdated database recovery.
 - [ ] On GNOME Wayland, test both shortcuts from GTK, Qt Wayland, XWayland, and terminal windows; verify focus restoration, paste, image previews, and clipboard preservation behavior.
-- [ ] On X11, test XFixes capture, shortcut grabs, text/image paste, and startup in a separate X11 session or automated Xvfb harness.
+- [x] On X11, test XFixes capture, shortcut grabs, text/image paste, and startup in a separate X11 session or automated Xvfb harness. (Automated Xvfb test passes with a separate target process; the compiled picker also passes an X11 smoke launch.)
 - [ ] Test both shortcut-conflict setup and uninstall restoration, including the case where the user changes a binding after installation.
 - [ ] Verify no clipboard payload appears in logs, no data is sent over the network, file permissions are user-only, and failures are explained in the UI.
 - [ ] Write README instructions for build, install, use, troubleshooting, supported desktops, known paste/restoration limits, and data removal.

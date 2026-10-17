@@ -34,6 +34,9 @@ endforeach()
 set_source_files_properties(resources/emoji/emoji-test.txt PROPERTIES
     QT_RESOURCE_ALIAS emoji-test.txt
 )
+set_source_files_properties(resources/icons/org.emojikeyboard.App.svg PROPERTIES
+    QT_RESOURCE_ALIAS org.emojikeyboard.App.svg
+)
 
 qt_add_qml_module(emoji-keyboard
     URI EmojiKeyboard
@@ -60,6 +63,10 @@ qt_add_resources(emoji-keyboard emoji_data
     PREFIX /data
     FILES resources/emoji/emoji-test.txt
 )
+qt_add_resources(emoji-keyboard app_icon
+    PREFIX /icons
+    FILES resources/icons/org.emojikeyboard.App.svg
+)
 
 target_include_directories(emoji-keyboard PRIVATE src src/app src/models)
 target_link_libraries(emoji-keyboard PRIVATE
@@ -72,6 +79,21 @@ target_link_libraries(emoji-keyboard PRIVATE
     Qt6::Sql
 )
 
+option(EMOJI_ENABLE_X11 "Build the X11 backend when XFixes and XTest are available" ON)
+if(EMOJI_ENABLE_X11 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    find_package(X11 QUIET COMPONENTS Xfixes Xtst Xi Xext)
+    if(X11_FOUND AND TARGET X11::Xfixes AND TARGET X11::Xtst
+        AND TARGET X11::Xi AND TARGET X11::Xext)
+        set(EMOJI_X11_AVAILABLE TRUE)
+        target_sources(emoji-keyboard PRIVATE
+            src/platform/x11/X11Backend.h src/platform/x11/X11Backend.cpp)
+        target_compile_definitions(emoji-keyboard PRIVATE EMOJI_HAS_X11)
+        target_link_libraries(emoji-keyboard PRIVATE X11::X11 X11::Xfixes X11::Xtst)
+    else()
+        message(STATUS "X11 backend disabled: XFixes/XTest development files not found")
+    endif()
+endif()
+
 set(EMOJI_KEYBOARD_EXECUTABLE "${CMAKE_CURRENT_BINARY_DIR}/emoji-keyboard")
 configure_file(integration/dbus/org.emojikeyboard.App.service.in
     "${CMAKE_CURRENT_BINARY_DIR}/org.emojikeyboard.App.service" @ONLY)
@@ -79,6 +101,10 @@ configure_file(integration/dbus/org.emojikeyboard.App.service.in
 install(TARGETS emoji-keyboard
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+install(FILES integration/desktop/org.emojikeyboard.App.desktop
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications)
+install(FILES resources/icons/org.emojikeyboard.App.svg
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/scalable/apps)
 
 include(CTest)
 if(BUILD_TESTING)
@@ -128,4 +154,31 @@ if(BUILD_TESTING)
     qt_add_executable(clipboard_test_source
         tests/integration/clipboard_test_source.cpp)
     target_link_libraries(clipboard_test_source PRIVATE Qt6::Gui)
+
+    if(EMOJI_X11_AVAILABLE)
+        find_program(XVFB_RUN_EXECUTABLE NAMES xvfb-run)
+        qt_add_executable(x11_test_target tests/integration/x11_test_target.cpp)
+        target_link_libraries(x11_test_target PRIVATE Qt6::Gui X11::X11)
+
+        qt_add_executable(tst_x11_backend
+            tests/integration/tst_x11_backend.cpp
+            src/platform/x11/X11Backend.h src/platform/x11/X11Backend.cpp
+            src/app/AppController.cpp
+            src/models/EmojiModel.cpp
+            src/models/ClipboardModel.cpp
+            src/storage/HistoryStore.cpp)
+        qt_add_resources(tst_x11_backend x11_test_emoji_data
+            PREFIX /data FILES resources/emoji/emoji-test.txt)
+        target_include_directories(tst_x11_backend PRIVATE src)
+        target_compile_definitions(tst_x11_backend PRIVATE
+            X11_TEST_TARGET="$<TARGET_FILE:x11_test_target>")
+        target_link_libraries(tst_x11_backend PRIVATE
+            Qt6::Quick Qt6::Sql Qt6::Test X11::X11 X11::Xfixes X11::Xtst)
+        if(XVFB_RUN_EXECUTABLE)
+            add_test(NAME x11_backend
+                COMMAND "${XVFB_RUN_EXECUTABLE}" -a "$<TARGET_FILE:tst_x11_backend>")
+            set_tests_properties(x11_backend PROPERTIES
+                ENVIRONMENT "QT_QPA_PLATFORM=xcb;QT_QUICK_BACKEND=software")
+        endif()
+    endif()
 endif()

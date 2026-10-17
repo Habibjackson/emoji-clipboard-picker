@@ -2,6 +2,9 @@
 #include "app/ClipboardImageProvider.h"
 #include "platform/gnome/PickerService.h"
 #include "storage/HistoryStore.h"
+#ifdef EMOJI_HAS_X11
+#include "platform/x11/X11Backend.h"
+#endif
 
 #include <QCommandLineOption>
 #include <QCommandLineParser>
@@ -11,9 +14,12 @@
 #include <QDBusReply>
 #include <QDebug>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QQuickWindow>
 #include <QQmlApplicationEngine>
 #include <QTimer>
+
+#include <memory>
 
 #include <sys/stat.h>
 
@@ -46,6 +52,8 @@ int main(int argc, char *argv[])
     QCoreApplication::setApplicationName(QStringLiteral("EmojiKeyboard"));
     QCoreApplication::setOrganizationName(QStringLiteral("EmojiKeyboard"));
     QGuiApplication::setApplicationDisplayName(QStringLiteral("Emoji Keyboard"));
+    QGuiApplication::setDesktopFileName(QStringLiteral("org.emojikeyboard.App"));
+    QGuiApplication::setWindowIcon(QIcon(QStringLiteral(":/icons/org.emojikeyboard.App.svg")));
     QGuiApplication::setQuitOnLastWindowClosed(false);
 
     QCommandLineParser parser;
@@ -111,6 +119,24 @@ int main(int argc, char *argv[])
     if (!window)
         return 1;
     PickerService picker(window, &controller);
+    bool x11HandlesCopy = false;
+#ifdef EMOJI_HAS_X11
+    std::unique_ptr<X11Backend> x11;
+    if (QGuiApplication::platformName() == QStringLiteral("xcb")) {
+        x11 = std::make_unique<X11Backend>(window, &controller);
+        if (!x11->isAvailable())
+            qWarning() << "X11 integration unavailable:" << x11->errorString();
+        else {
+            x11HandlesCopy = true;
+            QObject::connect(&picker, &PickerService::manualActivation,
+                             x11.get(), &X11Backend::disarm);
+        }
+    }
+#endif
+    if (QGuiApplication::platformName() == QStringLiteral("xcb") && !x11HandlesCopy) {
+        QObject::connect(&controller, &AppController::itemCopied,
+                         &controller, &AppController::discardEmojiClipboardSnapshot);
+    }
 
     if (busAvailable && !diagnostic) {
         if (!bus.registerObject(QString::fromLatin1(objectPath), &picker,

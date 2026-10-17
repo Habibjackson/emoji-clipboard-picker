@@ -43,6 +43,7 @@ public:
     Q_INVOKABLE void deleteEntry(qint64 id);
     Q_INVOKABLE void clearRecent();
     void reportPasteResult(const QString &result, const QString &shortcut);
+    void reportShortcutFailure(const QString &shortcut);
     void reportClipboardRestoreResult(ClipboardRestoreResult result);
     bool hasEmojiClipboardSnapshot() const;
     quint64 emojiClipboardSnapshotGeneration() const;
