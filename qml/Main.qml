@@ -172,6 +172,51 @@ T.ApplicationWindow {
             Layout.margins: 24
             spacing: 12
 
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: integrationNotice.implicitHeight + 20
+                visible: window.controller.integrationWarning.length > 0
+                radius: Theme.smallRadius
+                color: Theme.accentSoft
+
+                Column {
+                    id: integrationNotice
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 10
+                    spacing: 4
+
+                    Text {
+                        width: parent.width
+                        text: window.controller.copyOnly ? qsTr("Copy only")
+                                                         : qsTr("Shortcut unavailable")
+                        color: Theme.accent
+                        font.family: Theme.bodyFamily
+                        font.pixelSize: 12
+                        font.weight: Font.Bold
+                    }
+                    Text {
+                        width: parent.width
+                        text: window.controller.integrationWarning
+                        textFormat: Text.PlainText
+                        color: Theme.ink
+                        wrapMode: Text.Wrap
+                        font.family: Theme.bodyFamily
+                        font.pixelSize: 12
+                    }
+                    Text {
+                        width: parent.width
+                        visible: window.controller.copyOnly
+                        text: qsTr("Select an emoji or history item to copy it, then paste manually in your app.")
+                        color: Theme.ink
+                        wrapMode: Text.Wrap
+                        font.family: Theme.bodyFamily
+                        font.pixelSize: 12
+                    }
+                }
+            }
+
             Loader {
                 Layout.fillWidth: true
                 Layout.fillHeight: true

@@ -27,7 +27,7 @@
 - [x] Register C++ models and controllers as a QML module with `qt_add_qml_module`; expose typed properties and invokable actions rather than placing storage logic in QML JavaScript.
 - [x] Define one desktop integration interface used by the GNOME Wayland and X11 implementations: capture clipboard content, open a view, remember the target, paste a selection, and report failures. (`DesktopIntegration` is the shared contract; `PickerService` forwards its D-Bus calls to the selected backend, with a copy-only fallback.)
 - [x] Add a stable desktop-file ID and app icon so GNOME can identify and activate the Qt window. (`org.emojikeyboard.App` is set at startup; CMake installs its desktop entry and icon.)
-- [ ] Make backend or extension failure visible in the picker, with a copy-only fallback for a selected item.
+- [x] Make backend or extension failure visible in the picker, with a copy-only fallback for a selected item. (A persistent notice reports backend and shortcut failures; selecting an item keeps it on the clipboard when integration is unavailable, and the GNOME notice updates when the extension appears or disappears.)
 
 ## 3. Build the emoji catalog and recents
 

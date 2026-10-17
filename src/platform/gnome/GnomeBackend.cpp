@@ -8,11 +8,18 @@
 #include <QDBusPendingCallWatcher>
 #include <QDBusPendingReply>
 #include <QDBusReply>
+#include <QDBusServiceWatcher>
 #include <QTimer>
 
 GnomeBackend::GnomeBackend(QQuickWindow *window, AppController *controller, QObject *parent)
     : DesktopIntegration(window, controller, parent)
 {
+    auto *watcher = new QDBusServiceWatcher(
+        QStringLiteral("org.emojikeyboard.ClipboardProbe"), QDBusConnection::sessionBus(),
+        QDBusServiceWatcher::WatchForOwnerChange, this);
+    connect(watcher, &QDBusServiceWatcher::serviceOwnerChanged,
+            this, [this] { emit availabilityChanged(); });
+
     connect(m_controller, &AppController::itemCopied, this, [this] {
         if (!m_shortcutTargetArmed) {
             if (m_controller)
@@ -59,6 +66,11 @@ void GnomeBackend::openView(const QString &view)
 
 bool GnomeBackend::rememberTarget()
 {
+    if (!isAvailable()) {
+        m_shortcutTargetArmed = false;
+        reportFailure(QStringLiteral("bridge-unavailable"));
+        return false;
+    }
     // GNOME Shell captured the focused window before invoking ShowFromShortcut.
     m_shortcutTargetArmed = true;
     return true;

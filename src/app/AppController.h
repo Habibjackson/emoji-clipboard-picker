@@ -6,6 +6,7 @@
 #include <QByteArray>
 #include <QImage>
 #include <QObject>
+#include <QStringList>
 #include <QtQml/qqmlregistration.h>
 
 class QClipboard;
@@ -20,6 +21,8 @@ class AppController : public QObject
     Q_PROPERTY(ClipboardModel *clipboardModel READ clipboardModel CONSTANT)
     Q_PROPERTY(bool paused READ paused WRITE setPaused NOTIFY pausedChanged)
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
+    Q_PROPERTY(QString integrationWarning READ integrationWarning NOTIFY integrationWarningChanged)
+    Q_PROPERTY(bool copyOnly READ copyOnly NOTIFY integrationWarningChanged)
     Q_PROPERTY(QString initialView READ initialView CONSTANT)
     Q_PROPERTY(bool backgroundCaptureLimited READ backgroundCaptureLimited CONSTANT)
 
@@ -33,6 +36,8 @@ public:
     bool paused() const;
     void setPaused(bool paused);
     QString status() const;
+    QString integrationWarning() const;
+    bool copyOnly() const;
     QString initialView() const;
     bool backgroundCaptureLimited() const;
 
@@ -44,6 +49,7 @@ public:
     Q_INVOKABLE void clearRecent();
     void reportPasteResult(const QString &result, const QString &shortcut);
     void reportShortcutFailure(const QString &shortcut);
+    void setIntegrationAvailability(bool available, const QString &reason);
     void reportClipboardRestoreResult(ClipboardRestoreResult result);
     bool hasEmojiClipboardSnapshot() const;
     quint64 emojiClipboardSnapshotGeneration() const;
@@ -55,11 +61,13 @@ signals:
     void itemCopied();
     void pausedChanged();
     void statusChanged();
+    void integrationWarningChanged();
 
 private:
     void captureCurrentClipboard();
     void snapshotClipboardBeforeEmoji(const QString &symbol);
     void setStatus(const QString &message);
+    void refreshIntegrationWarning();
     bool isOwnClipboardContent(const QString &kind, const QByteArray &content);
     static QByteArray contentHash(const QString &kind, const QByteArray &content);
 
@@ -69,6 +77,10 @@ private:
     ClipboardModel m_clipboardModel;
     QString m_initialView;
     QString m_status;
+    QString m_backendFailure;
+    QStringList m_shortcutFailures;
+    QString m_integrationWarning;
+    bool m_copyOnly = false;
     QByteArray m_ownContentHash;
     enum class SnapshotKind { None, Text, Image };
     SnapshotKind m_snapshotKind = SnapshotKind::None;

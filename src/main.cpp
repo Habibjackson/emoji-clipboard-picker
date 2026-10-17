@@ -138,6 +138,12 @@ int main(int argc, char *argv[])
             window, &controller, QStringLiteral("X11 integration was not built"));
     if (!desktop)
         desktop = std::make_unique<GnomeBackend>(window, &controller);
+    const auto updateIntegrationAvailability = [&controller, &desktop] {
+        controller.setIntegrationAvailability(desktop->isAvailable(), desktop->errorString());
+    };
+    QObject::connect(desktop.get(), &DesktopIntegration::availabilityChanged,
+                     &controller, updateIntegrationAvailability);
+    updateIntegrationAvailability();
     PickerService picker(window, &controller, desktop.get());
 
     if (busAvailable && !diagnostic) {

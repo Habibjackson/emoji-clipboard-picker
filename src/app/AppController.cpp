@@ -65,6 +65,16 @@ QString AppController::status() const
     return m_status;
 }
 
+QString AppController::integrationWarning() const
+{
+    return m_integrationWarning;
+}
+
+bool AppController::copyOnly() const
+{
+    return m_copyOnly;
+}
+
 QString AppController::initialView() const
 {
     return m_initialView;
@@ -168,7 +178,38 @@ void AppController::reportPasteResult(const QString &result, const QString &shor
 
 void AppController::reportShortcutFailure(const QString &shortcut)
 {
-    setStatus(tr("%1 is unavailable because another application owns the shortcut.").arg(shortcut));
+    const QString message = tr("%1 is unavailable because another application owns the shortcut.")
+                                .arg(shortcut);
+    if (!m_shortcutFailures.contains(message)) {
+        m_shortcutFailures.append(message);
+        refreshIntegrationWarning();
+    }
+    setStatus(message);
+}
+
+void AppController::setIntegrationAvailability(bool available, const QString &reason)
+{
+    const QString failure = available ? QString()
+                                      : reason.isEmpty() ? tr("Desktop integration is unavailable")
+                                                         : reason;
+    if (m_copyOnly == !available && m_backendFailure == failure)
+        return;
+    m_copyOnly = !available;
+    m_backendFailure = failure;
+    refreshIntegrationWarning();
+}
+
+void AppController::refreshIntegrationWarning()
+{
+    QStringList messages;
+    if (!m_backendFailure.isEmpty())
+        messages.append(m_backendFailure);
+    messages.append(m_shortcutFailures);
+    const QString warning = messages.join(QLatin1Char('\n'));
+    if (m_integrationWarning == warning)
+        return;
+    m_integrationWarning = warning;
+    emit integrationWarningChanged();
 }
 
 void AppController::reportClipboardRestoreResult(ClipboardRestoreResult result)

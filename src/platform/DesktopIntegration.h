@@ -28,6 +28,9 @@ public:
 
     void reportFailure(const QString &reason);
 
+signals:
+    void availabilityChanged();
+
 protected:
     void showWindow(const QString &view);
 

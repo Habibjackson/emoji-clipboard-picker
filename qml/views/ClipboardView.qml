@@ -40,7 +40,7 @@ Item {
                 id: warning
                 anchors.fill: parent
                 anchors.margins: 10
-                text: qsTr("Wayland preview: use Capture current after copying. Background capture and Super shortcuts are coming next.")
+                text: qsTr("On Wayland, use Capture current if a copy made in another app is missing from history.")
                 textFormat: Text.PlainText
                 color: Theme.ink
                 wrapMode: Text.Wrap
