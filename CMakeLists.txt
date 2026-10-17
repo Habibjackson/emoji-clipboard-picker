@@ -2,14 +2,17 @@ cmake_minimum_required(VERSION 3.24)
 
 project(EmojiKeyboard VERSION 0.1.0 LANGUAGES CXX)
 
+include(GNUInstallDirs)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 6.11 REQUIRED COMPONENTS Quick QuickControls2 Sql)
+find_package(Qt6 6.11 REQUIRED COMPONENTS Core Gui Qml DBus Quick QuickControls2 Sql)
 qt_standard_project_setup(REQUIRES 6.11)
 
 qt_add_executable(emoji-keyboard
     src/main.cpp
+    src/platform/gnome/PickerService.h src/platform/gnome/PickerService.cpp
 )
 
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
@@ -60,10 +63,18 @@ qt_add_resources(emoji-keyboard emoji_data
 
 target_include_directories(emoji-keyboard PRIVATE src src/app src/models)
 target_link_libraries(emoji-keyboard PRIVATE
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Qml
+    Qt6::DBus
     Qt6::Quick
     Qt6::QuickControls2
     Qt6::Sql
 )
+
+set(EMOJI_KEYBOARD_EXECUTABLE "${CMAKE_CURRENT_BINARY_DIR}/emoji-keyboard")
+configure_file(integration/dbus/org.emojikeyboard.App.service.in
+    "${CMAKE_CURRENT_BINARY_DIR}/org.emojikeyboard.App.service" @ONLY)
 
 install(TARGETS emoji-keyboard
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -96,4 +107,22 @@ if(BUILD_TESTING)
     add_test(NAME app_controller COMMAND tst_app_controller)
     set_tests_properties(app_controller PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
+
+    find_program(GJS_EXECUTABLE NAMES gjs)
+    if(GJS_EXECUTABLE)
+        add_test(NAME gnome_clipboard_probe
+            COMMAND "${GJS_EXECUTABLE}" -m
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/tst_gnome_clipboard_probe.js")
+    endif()
+
+    find_program(GLIB_COMPILE_SCHEMAS_EXECUTABLE NAMES glib-compile-schemas)
+    if(GLIB_COMPILE_SCHEMAS_EXECUTABLE)
+        add_test(NAME gnome_shortcut_schema
+            COMMAND "${GLIB_COMPILE_SCHEMAS_EXECUTABLE}" --strict --dry-run
+                "${CMAKE_CURRENT_SOURCE_DIR}/integration/gnome-extension/schemas")
+    endif()
+
+    qt_add_executable(clipboard_test_source
+        tests/integration/clipboard_test_source.cpp)
+    target_link_libraries(clipboard_test_source PRIVATE Qt6::Gui)
 endif()

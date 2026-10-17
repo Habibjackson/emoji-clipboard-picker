@@ -10,13 +10,23 @@ T.ApplicationWindow {
     required property AppController controller
     property string currentView: controller.initialView
 
-    visible: true
-    width: 780
-    height: 580
+    visible: false
+    flags: Qt.Tool | Qt.FramelessWindowHint
+    width: 720
+    height: 520
     minimumWidth: 620
     minimumHeight: 480
     title: qsTr("Emoji Keyboard")
     background: Rectangle { color: Theme.canvas }
+    onClosing: function(close) {
+        close.accepted = false
+        window.hide()
+    }
+
+    Connections {
+        target: window.controller
+        function onItemCopied() { window.hide() }
+    }
 
     RowLayout {
         anchors.fill: parent
@@ -186,7 +196,7 @@ T.ApplicationWindow {
                     elide: Text.ElideRight
                 }
                 Text {
-                    text: qsTr("Ctrl+1 Emoji · Ctrl+2 Clipboard")
+                    text: qsTr("Ctrl+1 Emoji · Ctrl+2 Clipboard · Esc Hide")
                     color: Theme.muted
                     font.family: Theme.bodyFamily
                     font.pixelSize: 11
@@ -214,6 +224,10 @@ T.ApplicationWindow {
     }
     Shortcut {
         sequences: ["Escape"]
-        onActivated: window.close()
+        onActivated: window.hide()
+    }
+    Shortcut {
+        sequences: ["Ctrl+Q"]
+        onActivated: Qt.quit()
     }
 }

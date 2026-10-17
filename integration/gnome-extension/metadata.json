@@ -1,0 +1,7 @@
+{
+    "uuid": "emoji-keyboard@emojikeyboard.local",
+    "name": "Emoji Keyboard GNOME Bridge",
+    "description": "Checks clipboard notifications and activates the Emoji Keyboard picker.",
+    "shell-version": ["50"],
+    "settings-schema": "org.gnome.shell.extensions.emoji-keyboard"
+}

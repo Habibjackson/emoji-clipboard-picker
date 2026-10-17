@@ -12,19 +12,19 @@
 
 ## 1. Prove the desktop integration first
 
-- [ ] Create a minimal GNOME Shell extension prototype that receives `Meta.Selection::owner-changed` events while another Wayland application has focus. Verify text and image copies from GTK, Qt Wayland, and XWayland applications.
-- [ ] Prove that the extension can call a resident Qt process over the session D-Bus and that a clipboard event received before the Qt process starts can activate it.
-- [ ] Prove `Super+.` and `Super+V` can be registered after the existing IBus emoji and GNOME message-tray bindings are released.
+- [x] Create a minimal GNOME Shell extension prototype that receives `Meta.Selection::owner-changed` events while another Wayland application has focus. Verify text and image copies from GTK, Qt Wayland, and XWayland applications. (All three passed in isolated GNOME 50.1; the Qt Wayland test uses a painted, focused window and a fresh input event before each copy.)
+- [x] Prove that the extension can call a resident Qt process over the session D-Bus and that a clipboard event received before the Qt process starts can activate it. (A GTK Wayland copy activated the hidden Qt service from no owner in an isolated session; payload transfer is still pending.)
+- [x] Prove `Super+.` and `Super+V` can be registered after the existing IBus emoji and GNOME message-tray bindings are released. (Both opened the correct Qt view from a focused GTK window in an isolated GNOME 50.1 session; extension defaults remain disabled until guided setup.)
 - [ ] Prove the extension can remember the focused window, show a Qt window, restore the target window, and send the appropriate paste shortcut. Test a normal text field and a terminal.
 - [ ] Test temporary emoji clipboard replacement followed by restoration of prior text and image content. Never restore over a newer copy made by the user; record cases where restoration cannot be guaranteed.
 - [ ] Prove X11 clipboard change monitoring through XFixes and global shortcut/paste behavior through X11 key grabs and XTest.
-- [ ] Record the tested GNOME Shell versions and any version-specific API branches. Test GNOME 50 on the current machine first.
+- [x] Record the tested GNOME Shell versions and any version-specific API branches. Test GNOME 50 on the current machine first. (GNOME Shell 50.1 tested; the extension currently targets only version 50 and has no version branches.)
 
 ## 2. Create the Qt application foundation
 
-- [ ] Add a CMake project pinned to Qt 6.11 components: Core, Gui, Quick, QuickControls2, Qml, Sql, and DBus. Add X11/XFixes/XTest dependencies only for the X11 backend.
-- [ ] Create one resident process with a single-instance D-Bus name, a hidden-by-default QML picker, and a command-line option to open either view for debugging.
-- [ ] Register C++ models and controllers as a QML module with `qt_add_qml_module`; expose typed properties and invokable actions rather than placing storage logic in QML JavaScript.
+- [x] Add a CMake project pinned to Qt 6.11 components: Core, Gui, Quick, QuickControls2, Qml, Sql, and DBus. Add X11/XFixes/XTest dependencies only for the X11 backend. (The X11 backend has not been added yet.)
+- [x] Create one resident process with a single-instance D-Bus name, a hidden-by-default QML picker, and a command-line option to open either view for debugging.
+- [x] Register C++ models and controllers as a QML module with `qt_add_qml_module`; expose typed properties and invokable actions rather than placing storage logic in QML JavaScript.
 - [ ] Define one desktop integration interface used by the GNOME Wayland and X11 implementations: capture clipboard content, open a view, remember the target, paste a selection, and report failures.
 - [ ] Add a stable desktop-file ID and app icon so GNOME can identify and activate the Qt window.
 - [ ] Make backend or extension failure visible in the picker, with a copy-only fallback for a selected item.

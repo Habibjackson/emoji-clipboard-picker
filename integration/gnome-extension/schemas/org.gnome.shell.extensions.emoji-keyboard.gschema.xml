@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.emoji-keyboard"
+          path="/org/gnome/shell/extensions/emoji-keyboard/">
+    <key name="show-emoji" type="as">
+      <default>[]</default>
+      <summary>Shortcut to open the emoji picker</summary>
+    </key>
+    <key name="show-clipboard" type="as">
+      <default>[]</default>
+      <summary>Shortcut to open clipboard history</summary>
+    </key>
+  </schema>
+</schemalist>

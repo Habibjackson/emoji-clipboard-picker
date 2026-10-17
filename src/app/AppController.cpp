@@ -92,6 +92,7 @@ void AppController::copyEmoji(const QString &symbol)
     } else {
         setStatus(tr("Emoji copied, but its recent entry could not be saved."));
     }
+    emit itemCopied();
 }
 
 void AppController::copyEntry(qint64 id)
@@ -117,6 +118,7 @@ void AppController::copyEntry(qint64 id)
     m_store->touch(id);
     m_clipboardModel.reload();
     setStatus(tr("Item copied. Paste it in your app."));
+    emit itemCopied();
 }
 
 void AppController::pinEntry(qint64 id, bool pinned)

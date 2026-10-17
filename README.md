@@ -14,9 +14,11 @@ cmake --build build --target emoji-keyboard_qmllint
 ./build/emoji-keyboard
 ```
 
-Run `./build/emoji-keyboard --clipboard` to open the history view directly. Use `Ctrl+1` and `Ctrl+2` to switch views, or `Ctrl+F` to focus search. Select an emoji or saved item to copy it, then paste in the target application yourself. You can pin, unpin, delete, clear unpinned history, or pause capture in the clipboard view.
+Run `./build/emoji-keyboard --clipboard` to open the history view directly. The picker now runs as one resident process: later launches reopen the existing window, `Escape` hides it, and `Ctrl+Q` or `./build/emoji-keyboard --quit` exits. Use `--background` to start it hidden. `Ctrl+1` and `Ctrl+2` switch views; `Ctrl+F` focuses search. Select an emoji or saved item to copy it, then paste in the target application yourself. You can pin, unpin, delete, clear unpinned history, or pause capture in the clipboard view.
 
-Clipboard monitoring uses Qt's clipboard notifications while the application runs. GNOME Wayland may not expose copies made while this window is unfocused; use **Capture current** after returning to the picker to save the current clipboard item. Global `Super+.` / `Super+V` shortcuts, full background capture, automatic paste, and focus restoration are planned for the GNOME extension and X11 backends. No shortcut settings are changed by this version.
+On Linux, the app defaults to Qt's generic platform theme because its custom QML controls do not use GTK styling. This avoids a GTK/GSettings startup crash when launched from some Snap-hosted IDE terminals. An explicit `QT_QPA_PLATFORMTHEME` value still takes precedence.
+
+Clipboard monitoring uses Qt's clipboard notifications while the application runs. GNOME Wayland may not expose copies made while this window is unfocused; use **Capture current** after returning to the picker to save the current clipboard item. A GNOME Shell 50 development extension in [`integration/gnome-extension/`](integration/gnome-extension/README.md) detects clipboard owner changes, starts the hidden picker through session D-Bus, and registers `Super+.` / `Super+V` bindings. The bindings default to disabled until guided setup can release existing GNOME shortcuts. The extension currently sends only clipboard kind, so full background capture, automatic paste, and focus restoration remain to be implemented. No shortcut settings are changed by this version.
 
 History is stored in SQLite under Qt's user-specific `AppDataLocation` with a private directory and database file. Text is capped at 1 MiB and encoded images at 10 MiB. File copy operations and recognized secret-marked content are skipped. The application makes no network requests.
 

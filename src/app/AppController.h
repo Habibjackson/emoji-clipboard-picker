@@ -41,6 +41,7 @@ public:
     Q_INVOKABLE void clearRecent();
 
 signals:
+    void itemCopied();
     void pausedChanged();
     void statusChanged();
 

@@ -24,7 +24,7 @@ Use four spaces and follow the existing brace style in C++. Name C++ types and Q
 
 ## Testing Guidelines
 
-Qt Test covers storage and clipboard controller behavior; no coverage threshold is set. Add focused Qt Test cases for C++ behavior and Qt Quick Test cases for QML behavior as those modules arrive. Name test files `tst_<feature>.cpp` or `tst_<Feature>.qml`. Verify clipboard limits, pinning, deduplication, and restart persistence; exercise GNOME Wayland and X11 flows in their respective sessions.
+Qt Test covers storage and clipboard controller behavior; a GJS test checks GNOME clipboard MIME classification. No coverage threshold is set. Add focused Qt Test cases for C++ behavior and Qt Quick Test cases for QML behavior as those modules arrive. Name test files `tst_<feature>.cpp` or `tst_<Feature>.qml`. Verify clipboard limits, pinning, deduplication, and restart persistence; exercise GNOME Wayland and X11 flows in their respective sessions.
 
 ## Commit & Pull Request Guidelines
 
