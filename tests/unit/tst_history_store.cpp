@@ -22,6 +22,7 @@ private slots:
     void privatePermissions();
     void migratesUnversionedDatabase();
     void rejectsIncompatibleDatabase();
+    void clearAllKeepsEmojiRecents();
 };
 
 void HistoryStoreTest::limitsAndPersistence()
@@ -58,6 +59,7 @@ void HistoryStoreTest::limitsAndPersistence()
 
         QVERIFY(store.setPinned(pinnedIds.first(), false));
         QCOMPARE(store.entries().size(), 24);
+        QCOMPARE(store.entries().at(4).id, pinnedIds.first());
         QVERIFY(store.clearRecent());
         QCOMPARE(store.entries().size(), 4);
     }
@@ -214,6 +216,28 @@ void HistoryStoreTest::rejectsIncompatibleDatabase()
     database.close();
     database = QSqlDatabase();
     QSqlDatabase::removeDatabase(connection);
+}
+
+void HistoryStoreTest::clearAllKeepsEmojiRecents()
+{
+    QTemporaryDir directory;
+    const QString path = directory.filePath(QStringLiteral("history.sqlite"));
+    {
+        HistoryStore store(path);
+        QVERIFY(store.open());
+        QVERIFY(store.addText(QStringLiteral("pinned")));
+        const qint64 pinnedId = store.entries().first().id;
+        QVERIFY(store.setPinned(pinnedId, true));
+        QVERIFY(store.addText(QStringLiteral("recent")));
+        QVERIFY(store.recordEmoji(QString::fromUtf8("🎉")));
+        QVERIFY(store.clearAll());
+        QVERIFY(store.entries().isEmpty());
+        QCOMPARE(store.recentEmoji(), QStringList { QString::fromUtf8("🎉") });
+    }
+    HistoryStore reopened(path);
+    QVERIFY(reopened.open());
+    QVERIFY(reopened.entries().isEmpty());
+    QCOMPARE(reopened.recentEmoji(), QStringList { QString::fromUtf8("🎉") });
 }
 
 QTEST_GUILESS_MAIN(HistoryStoreTest)

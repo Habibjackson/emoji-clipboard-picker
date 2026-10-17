@@ -393,9 +393,26 @@ bool HistoryStore::remove(qint64 id)
 
 bool HistoryStore::clearRecent()
 {
-    if (!isOpen())
+    if (!isOpen()) {
+        setError(QStringLiteral("History database is unavailable"));
         return false;
-    return exec(QStringLiteral("DELETE FROM clipboard_entries WHERE pinned = 0"));
+    }
+    if (!exec(QStringLiteral("DELETE FROM clipboard_entries WHERE pinned = 0")))
+        return false;
+    m_error.clear();
+    return true;
+}
+
+bool HistoryStore::clearAll()
+{
+    if (!isOpen()) {
+        setError(QStringLiteral("History database is unavailable"));
+        return false;
+    }
+    if (!exec(QStringLiteral("DELETE FROM clipboard_entries")))
+        return false;
+    m_error.clear();
+    return true;
 }
 
 QStringList HistoryStore::recentEmoji() const

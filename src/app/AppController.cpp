@@ -278,6 +278,16 @@ void AppController::clearRecent()
     setStatus(tr("Recent clipboard items cleared"));
 }
 
+void AppController::clearAll()
+{
+    if (!m_store->clearAll()) {
+        setStatus(m_store->errorString());
+        return;
+    }
+    m_clipboardModel.reload();
+    setStatus(tr("All clipboard history cleared"));
+}
+
 void AppController::reportPasteResult(const QString &result, const QString &shortcut)
 {
     if (result == QStringLiteral("sent")) {

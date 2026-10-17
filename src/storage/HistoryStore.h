@@ -41,6 +41,7 @@ public:
     bool touch(qint64 id);
     bool remove(qint64 id);
     bool clearRecent();
+    bool clearAll();
 
     QStringList recentEmoji() const;
     bool recordEmoji(const QString &symbol);

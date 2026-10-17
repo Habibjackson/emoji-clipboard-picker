@@ -150,6 +150,12 @@ T.ApplicationWindow {
                         text: qsTr("Clear recent")
                         onClicked: window.controller.clearRecent()
                     }
+                    ActionButton {
+                        Layout.fillWidth: true
+                        text: qsTr("Clear all")
+                        accessibilityLabel: qsTr("Clear all clipboard history")
+                        onClicked: clearAllDialog.open()
+                    }
                     Item { Layout.fillHeight: true }
                 }
 
@@ -259,6 +265,67 @@ T.ApplicationWindow {
         ClipboardView { controller: window.controller }
     }
 
+    T.Popup {
+        id: clearAllDialog
+        parent: window.contentItem
+        x: Math.round((parent.width - width) / 2)
+        y: Math.round((parent.height - height) / 2)
+        width: Math.min(390, parent.width - 32)
+        height: confirmation.implicitHeight + topPadding + bottomPadding
+        padding: 20
+        modal: true
+        focus: true
+        closePolicy: T.Popup.CloseOnEscape | T.Popup.CloseOnPressOutside
+        onOpened: cancelClear.forceActiveFocus()
+
+        background: Rectangle {
+            radius: Theme.radius
+            color: Theme.surface
+            border.color: Theme.line
+            border.width: 1
+        }
+        contentItem: ColumnLayout {
+            id: confirmation
+            spacing: 16
+
+            Text {
+                Layout.fillWidth: true
+                text: qsTr("Clear all clipboard history?")
+                color: Theme.ink
+                font.family: Theme.bodyFamily
+                font.pixelSize: 18
+                font.weight: Font.Bold
+                wrapMode: Text.Wrap
+            }
+            Text {
+                Layout.fillWidth: true
+                text: qsTr("This deletes all pinned and recent clipboard items from this device. Emoji recents stay.")
+                color: Theme.muted
+                font.family: Theme.bodyFamily
+                font.pixelSize: 13
+                wrapMode: Text.Wrap
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Item { Layout.fillWidth: true }
+                ActionButton {
+                    id: cancelClear
+                    text: qsTr("Cancel")
+                    onClicked: clearAllDialog.close()
+                }
+                ActionButton {
+                    text: qsTr("Clear all")
+                    prominent: true
+                    accessibilityLabel: qsTr("Confirm clear all clipboard history")
+                    onClicked: {
+                        window.controller.clearAll()
+                        clearAllDialog.close()
+                    }
+                }
+            }
+        }
+    }
+
     Shortcut {
         sequences: ["Ctrl+1"]
         onActivated: window.currentView = "emoji"
@@ -269,6 +336,7 @@ T.ApplicationWindow {
     }
     Shortcut {
         sequences: ["Escape"]
+        enabled: !clearAllDialog.visible
         onActivated: window.hide()
     }
     Shortcut {

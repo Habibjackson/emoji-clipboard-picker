@@ -83,6 +83,10 @@ void AppControllerTest::capturesAndCopies()
     QGuiApplication::clipboard()->setText(QStringLiteral("do not save this"));
     controller.captureNow();
     QCOMPARE(store.entries().size(), 2);
+    controller.clearAll();
+    QVERIFY(store.entries().isEmpty());
+    QCOMPARE(controller.clipboardModel()->resultCount(), 0);
+    QCOMPARE(controller.status(), QStringLiteral("All clipboard history cleared"));
 }
 
 void AppControllerTest::capturesCommonMimeFormatsAndPrefersImage()

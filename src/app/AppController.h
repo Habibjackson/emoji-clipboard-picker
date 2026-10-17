@@ -47,6 +47,7 @@ public:
     Q_INVOKABLE void pinEntry(qint64 id, bool pinned);
     Q_INVOKABLE void deleteEntry(qint64 id);
     Q_INVOKABLE void clearRecent();
+    Q_INVOKABLE void clearAll();
     void reportPasteResult(const QString &result, const QString &shortcut);
     void reportShortcutFailure(const QString &shortcut);
     void setIntegrationAvailability(bool available, const QString &reason);
