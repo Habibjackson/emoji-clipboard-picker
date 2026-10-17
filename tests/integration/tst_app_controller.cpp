@@ -46,6 +46,7 @@ class AppControllerTest : public QObject
 private slots:
     void capturesAndCopies();
     void capturesCommonMimeFormatsAndPrefersImage();
+    void capturesShellClipboardPayload();
     void skipsUnsafeOrUnsupportedClipboardItems();
     void pauseResumeCapturesCurrentClipboard();
     void keepsPasteFailuresVisibleUntilTheNextAction();
@@ -161,6 +162,49 @@ void AppControllerTest::capturesCommonMimeFormatsAndPrefersImage()
         QCOMPARE(QImage::fromData(store.payload(entry.id), "PNG").size(), image.size());
         QVERIFY(!store.preview(entry.id).isEmpty());
     }
+}
+
+void AppControllerTest::capturesShellClipboardPayload()
+{
+    QTemporaryDir directory;
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QVERIFY(store.open());
+    QGuiApplication::clipboard()->clear();
+    AppController controller(&store, QStringLiteral("clipboard"));
+
+    const QByteArray text = QString::fromUtf8("Wayland 😀\nsecond line").toUtf8();
+    controller.capturePayload(QStringLiteral("text"),
+                              QStringLiteral("text/plain;charset=utf-8"), text);
+    QCOMPARE(store.entries().size(), 1);
+    QCOMPARE(store.entries().first().text, QString::fromUtf8(text));
+    controller.capturePayload(QStringLiteral("text"), QStringLiteral("text/plain"), text);
+    QCOMPARE(store.entries().size(), 1);
+
+    QImage image(3, 2, QImage::Format_RGB32);
+    image.fill(Qt::red);
+    QByteArray encoded;
+    QBuffer buffer(&encoded);
+    QVERIFY(buffer.open(QIODevice::WriteOnly));
+    QVERIFY(image.save(&buffer, "PNG"));
+    controller.capturePayload(QStringLiteral("image"), QStringLiteral("image/png"), encoded);
+    QCOMPARE(store.entries().size(), 2);
+    const ClipboardEntry entry = store.entries().first();
+    QCOMPARE(entry.kind, QStringLiteral("image"));
+    QCOMPARE(QImage::fromData(store.payload(entry.id), "PNG").size(), image.size());
+    QVERIFY(!store.preview(entry.id).isEmpty());
+
+    controller.capturePayload(QStringLiteral("image"), QStringLiteral("image/avif"), {});
+    QCOMPARE(store.entries().size(), 2);
+    QCOMPARE(controller.status(), QStringLiteral("Unsupported image format was skipped"));
+
+    controller.setPaused(true);
+    controller.capturePayload(QStringLiteral("text"), QStringLiteral("text/plain"),
+                              QByteArray("paused"));
+    QCOMPARE(store.entries().size(), 2);
+    controller.setPaused(false);
+    controller.capturePayload(QStringLiteral("text"), QStringLiteral("application/x-keepassxc-secret"),
+                              QByteArray("synthetic secret"));
+    QCOMPARE(store.entries().size(), 2);
 }
 
 void AppControllerTest::skipsUnsafeOrUnsupportedClipboardItems()

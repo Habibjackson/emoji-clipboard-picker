@@ -10,6 +10,7 @@
 #include <QtQml/qqmlregistration.h>
 
 class QClipboard;
+class QMimeData;
 class HistoryStore;
 
 class AppController : public QObject
@@ -27,7 +28,8 @@ class AppController : public QObject
     Q_PROPERTY(QString integrationWarning READ integrationWarning NOTIFY integrationWarningChanged)
     Q_PROPERTY(bool copyOnly READ copyOnly NOTIFY integrationWarningChanged)
     Q_PROPERTY(QString initialView READ initialView CONSTANT)
-    Q_PROPERTY(bool backgroundCaptureLimited READ backgroundCaptureLimited CONSTANT)
+    Q_PROPERTY(bool backgroundCaptureLimited READ backgroundCaptureLimited
+                   NOTIFY integrationWarningChanged)
 
 public:
     enum class ClipboardRestoreResult { Restored, Unavailable, Changed };
@@ -49,6 +51,7 @@ public:
     bool backgroundCaptureLimited() const;
 
     Q_INVOKABLE void captureNow();
+    void capturePayload(const QString &kind, const QString &mimeType, const QByteArray &content);
     Q_INVOKABLE void copyEmoji(const QString &symbol);
     Q_INVOKABLE void copyEntry(qint64 id);
     Q_INVOKABLE void pinEntry(qint64 id, bool pinned);
@@ -76,6 +79,7 @@ signals:
 
 private:
     void captureCurrentClipboard();
+    void captureMimeData(const QMimeData *mime);
     void snapshotClipboardBeforeEmoji(const QString &symbol);
     void setStatus(const QString &message);
     void setAttention(const QString &message);

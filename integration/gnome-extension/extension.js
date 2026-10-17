@@ -13,6 +13,12 @@ import {pasteShortcutFor} from './pasteShortcut.js';
 
 const BUS_NAME = 'org.emojikeyboard.ClipboardProbe';
 const OBJECT_PATH = '/org/emojikeyboard/ClipboardProbe';
+const MAX_TEXT_BYTES = 1024 * 1024;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const IMAGE_MIME_TYPES = [
+    'image/png', 'image/jpeg', 'image/bmp', 'image/x-ms-bmp',
+    'image/gif', 'image/webp', 'image/tiff',
+];
 const INTERFACE_XML = `
 <node>
   <interface name="org.emojikeyboard.ClipboardProbe">
@@ -47,7 +53,7 @@ const INTERFACE_XML = `
 export default class EmojiKeyboardExtension extends Extension {
     enable() {
         // The native X11 backend owns clipboard monitoring and key grabs there.
-        this._inactiveOnX11 = !Meta.is_wayland_compositor();
+        this._inactiveOnX11 = !global.context.get_wayland_compositor();
         if (this._inactiveOnX11)
             return;
         this._counts = {total: 0, text: 0, image: 0, other: 0};
@@ -237,15 +243,23 @@ export default class EmojiKeyboardExtension extends Extension {
         if (!pickerFocused)
             this._targetWindow = focused;
         this._openClipboardRevision = this._clipboardRevision;
-        this._pasteGeneration++;
+        const generation = ++this._pasteGeneration;
 
         this._bus.call('org.emojikeyboard.App', '/org/emojikeyboard/App',
             'org.emojikeyboard.App', 'ShowFromShortcut',
             new GLib.Variant('(sb)', [view, pickerFocused]), new GLib.VariantType('(u)'),
             Gio.DBusCallFlags.NONE, -1, null, (connection, result) => {
+                if (generation !== this._pasteGeneration)
+                    return;
                 try {
                     const reply = connection.call_finish(result);
                     this._pickerPid = reply.deep_unpack()[0];
+                    if (this._pickerPid) {
+                        const picker = global.display.list_all_windows().find(
+                            window => window.get_pid() === this._pickerPid);
+                        if (picker?.showing_on_its_workspace())
+                            picker.activate(global.get_current_time());
+                    }
                 } catch {
                     this._targetWindow = null;
                     console.warn('Emoji Keyboard could not open');
@@ -294,13 +308,44 @@ export default class EmojiKeyboardExtension extends Extension {
         this._counts[kind]++;
         this._exported?.emit_signal('Changed', new GLib.Variant('(s)', [kind]));
         if (kind === 'text' || kind === 'image')
-            this._notifyPicker(kind);
+            this._captureClipboard(kind, mimeTypes, this._clipboardRevision);
     }
 
-    _notifyPicker(kind) {
+    _captureClipboard(kind, mimeTypes, revision) {
+        const clipboard = St.Clipboard.get_default();
+        const type = St.ClipboardType.CLIPBOARD;
+        if (kind === 'text') {
+            clipboard.get_text(type, (_clipboard, text) => {
+                if (!this._bus || revision !== this._clipboardRevision || text === null)
+                    return;
+                const bytes = new TextEncoder().encode(text);
+                this._sendClipboardPayload('text', 'text/plain;charset=utf-8',
+                    bytes.subarray(0, MAX_TEXT_BYTES + 1));
+            });
+            return;
+        }
+
+        const offered = mimeTypes.map(mime => mime.toLowerCase());
+        const mime = IMAGE_MIME_TYPES.find(candidate => offered.includes(candidate));
+        if (!mime) {
+            this._sendClipboardPayload('image',
+                offered.find(candidate => candidate.startsWith('image/')),
+                new Uint8Array());
+            return;
+        }
+        clipboard.get_content(type, mime, (_clipboard, bytes) => {
+            if (!this._bus || revision !== this._clipboardRevision)
+                return;
+            const data = bytes?.get_data() ?? new Uint8Array();
+            this._sendClipboardPayload('image', mime,
+                data.subarray(0, MAX_IMAGE_BYTES + 1));
+        });
+    }
+
+    _sendClipboardPayload(kind, mime, bytes) {
         this._bus.call('org.emojikeyboard.App', '/org/emojikeyboard/App',
-            'org.emojikeyboard.App', 'NotifyClipboardChanged',
-            new GLib.Variant('(s)', [kind]), null, Gio.DBusCallFlags.NONE,
+            'org.emojikeyboard.App', 'NotifyClipboardPayload',
+            new GLib.Variant('(ssay)', [kind, mime, bytes]), null, Gio.DBusCallFlags.NONE,
             -1, null, (connection, result) => {
                 try {
                     connection.call_finish(result);

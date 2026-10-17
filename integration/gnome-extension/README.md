@@ -1,6 +1,6 @@
 # GNOME Shell bridge
 
-This extension targets GNOME Shell 50. It listens for `Meta.Selection::owner-changed` on the regular clipboard, classifies offered MIME types as text, image, or other, and exposes event counts over session D-Bus. Text and image events activate the hidden Qt picker through D-Bus. It does not read or log clipboard payloads. On X11 it stays inactive because the native Qt backend handles monitoring and shortcuts.
+This extension targets GNOME Shell 50. It listens for `Meta.Selection::owner-changed` on the regular clipboard, classifies offered MIME types as text, image, or other, and exposes event counts over session D-Bus. For text and supported images it reads the current payload and sends up to the capture limit plus one byte to the Qt picker over the current user's session bus (1 MiB for text, 10 MiB for images). Qt enforces the limits and saves accepted items locally. The extension neither stores nor logs clipboard payloads. On X11 it stays inactive because the native Qt backend handles monitoring and shortcuts.
 
 For a normal user install, build the application and run `python3 scripts/emoji_keyboard.py install` from the repository root. This installs the extension, compiles its schema, starts the user service, and guides the known shortcut changes. `python3 scripts/emoji_keyboard.py recheck` reports known conflicts. See the root [README](../../README.md#install-and-shortcuts) for logout/login and removal steps.
 
@@ -23,9 +23,16 @@ gdbus call --session --dest org.emojikeyboard.ClipboardProbe \
     --method org.emojikeyboard.ClipboardProbe.GetStats
 ```
 
-The four returned numbers are total, text, image, and other owner changes since the extension was enabled. They reset when the extension reloads. Repeat with a GTK app, a Qt Wayland app, and an XWayland app to validate those paths. The classification and settings-schema tests run through `ctest --test-dir build --output-on-failure` when their GNOME tools are installed.
+The four returned numbers are total, text, image, and other owner changes since the extension was enabled. They reset when the extension reloads. The classification and settings-schema tests run through `ctest --test-dir build --output-on-failure` when their GNOME tools are installed.
 
-In an isolated GNOME Shell 50.1 test, GTK Wayland, Qt Wayland, and Qt XWayland each produced text and PNG image events. `build/clipboard_test_source` is a painted Qt window for this check. The Qt Wayland source needs keyboard focus and a fresh input event before each clipboard write; an unmapped or unfocused test window cannot establish a Wayland clipboard selection.
+Run the GNOME 50.1 end-to-end test in a disposable headless Shell and D-Bus session:
+
+```sh
+cmake --build build --target emoji-keyboard gnome_test_target
+python3 tests/integration/tst_gnome_headless.py
+```
+
+It copies the extension and creates private XDG settings and data paths; it does not change the current desktop profile. It checks both shortcuts from GTK Wayland, Qt Wayland, XWayland, and a terminal-style target; text/image capture, a rendered image thumbnail, focus restoration, history image paste, prior text/image restoration, and survival across a fresh Shell and bus session. Qt Wayland clipboard writes require a focused window and a fresh input event. A real installed-session logout/login remains a release check.
 
 With the Qt D-Bus service installed, the extension can activate the hidden picker before keyboard shortcuts are wired up:
 
@@ -39,4 +46,4 @@ Use `ShowClipboard` to open the history view. The installer writes the session D
 
 The extension contains `show-emoji` and `show-clipboard` bindings with empty defaults. In an isolated GNOME 50.1 session, removing only `<Super>period` from IBus's emoji hotkey and `<Super>v` from GNOME's message-tray shortcut allowed both bindings to register. Synthetic `Super+.` and `Super+V` presses from a focused GTK window opened the corresponding Qt views. The installer backs up and removes just those known conflicts after one prompt, and restores unchanged values on uninstall.
 
-For shortcut-opened selections, Shell remembers the focused window, waits for it to regain focus, then sends `Ctrl+V` or `Ctrl+Shift+V` for recognized terminals. The Clipboard view's **Paste shortcut** setting can force either combination when detection is wrong; the Qt app sends that choice with each paste request. Closing the picker cancels an outstanding paste request. The isolated GNOME 50.1 test used a GTK 4 entry and a VTE terminal with the `org.gnome.Ptyxis` app ID. If focus cannot be restored, the item remains copied for manual paste. An emoji selection temporarily replaces the clipboard; Shell restores prior plain text or PNG data after 750 ms only while that emoji is still current and no newer clipboard owner event has occurred. Text, image, and newer-copy preservation, including another copy of the same emoji, passed in the isolated session before the override and cancellation changes; those changes have D-Bus contract tests but still need a live GNOME retest. Clipboard payloads are transferred only within the user's session D-Bus for restoration, never written to the extension log. The delay cannot guarantee that every target has finished reading the temporary clipboard.
+For shortcut-opened selections, Shell remembers the focused window, activates the Qt picker, then restores target focus and sends `Ctrl+V` or `Ctrl+Shift+V` for recognized terminals. The Clipboard view's **Paste shortcut** setting can force either combination when detection is wrong; the Qt app sends that choice with each paste request. Closing the picker cancels an outstanding paste request. The headless test uses a GTK 4 entry with the `org.gnome.Ptyxis` app ID to check terminal shortcut detection. If focus cannot be restored, the item remains copied for manual paste. An emoji selection temporarily replaces the clipboard; Shell restores prior plain text or PNG data after 750 ms only while that emoji is still current and no newer clipboard owner event has occurred. Newer-copy preservation, including another copy of the same emoji, is covered by isolated GNOME and controller tests. The delay cannot guarantee that every target has finished reading the temporary clipboard.

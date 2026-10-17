@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QByteArray>
 #include <QObject>
 #include <QPointer>
 #include <QString>
@@ -21,6 +22,8 @@ public:
     virtual bool isAvailable() const = 0;
     virtual QString errorString() const = 0;
     virtual void captureClipboard(const QString &kind) = 0;
+    virtual void captureClipboardPayload(const QString &kind, const QString &mimeType,
+                                         const QByteArray &content);
     virtual void openView(const QString &view) = 0;
     virtual bool rememberTarget() = 0;
     virtual void pasteSelection(bool emoji, quint64 snapshotGeneration) = 0;

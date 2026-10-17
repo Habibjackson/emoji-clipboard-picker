@@ -12,6 +12,8 @@ public:
     bool isAvailable() const override;
     QString errorString() const override;
     void captureClipboard(const QString &kind) override;
+    void captureClipboardPayload(const QString &kind, const QString &mimeType,
+                                 const QByteArray &content) override;
     void openView(const QString &view) override;
     bool rememberTarget() override;
     void pasteSelection(bool emoji, quint64 snapshotGeneration) override;

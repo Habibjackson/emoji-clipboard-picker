@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QByteArray>
 #include <QObject>
 #include <QPointer>
 #include <QString>
@@ -23,6 +24,8 @@ public slots:
     Q_SCRIPTABLE void ShowClipboard();
     Q_SCRIPTABLE uint ShowFromShortcut(const QString &view, bool pickerFocused);
     Q_SCRIPTABLE void NotifyClipboardChanged(const QString &kind);
+    Q_SCRIPTABLE void NotifyClipboardPayload(const QString &kind, const QString &mimeType,
+                                             const QByteArray &content);
     Q_SCRIPTABLE void Hide();
     Q_SCRIPTABLE void Quit();
     Q_SCRIPTABLE QString CurrentView() const;

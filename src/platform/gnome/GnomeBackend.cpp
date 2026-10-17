@@ -75,6 +75,13 @@ void GnomeBackend::captureClipboard(const QString &kind)
         m_controller->captureNow();
 }
 
+void GnomeBackend::captureClipboardPayload(const QString &kind, const QString &mimeType,
+                                           const QByteArray &content)
+{
+    if (m_controller)
+        m_controller->capturePayload(kind, mimeType, content);
+}
+
 void GnomeBackend::openView(const QString &view)
 {
     showWindow(view);

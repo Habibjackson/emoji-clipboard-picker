@@ -202,6 +202,10 @@ if(BUILD_TESTING)
         tests/integration/clipboard_test_source.cpp)
     target_link_libraries(clipboard_test_source PRIVATE Qt6::Gui)
 
+    qt_add_executable(gnome_test_target
+        tests/integration/gnome_test_target.cpp)
+    target_link_libraries(gnome_test_target PRIVATE Qt6::Gui)
+
     if(EMOJI_X11_AVAILABLE)
         find_program(XVFB_RUN_EXECUTABLE NAMES xvfb-run)
         qt_add_executable(x11_test_target tests/integration/x11_test_target.cpp)

@@ -14,6 +14,10 @@ DesktopIntegration::DesktopIntegration(QQuickWindow *window, AppController *cont
     , m_controller(controller)
 {}
 
+void DesktopIntegration::captureClipboardPayload(const QString &, const QString &,
+                                                  const QByteArray &)
+{}
+
 void DesktopIntegration::reportFailure(const QString &reason)
 {
     if (m_controller)

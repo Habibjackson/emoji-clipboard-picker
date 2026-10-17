@@ -47,7 +47,7 @@ uint PickerService::ShowFromShortcut(const QString &view, bool pickerFocused)
             Hide();
         else
             m_backend->openView(view);
-        return uint(QCoreApplication::applicationPid());
+        return IsVisible() ? uint(QCoreApplication::applicationPid()) : 0;
     }
     const bool targetKnown = m_backend->rememberTarget();
     m_backend->openView(view);
@@ -58,6 +58,13 @@ void PickerService::NotifyClipboardChanged(const QString &kind)
 {
     if (m_backend)
         m_backend->captureClipboard(kind);
+}
+
+void PickerService::NotifyClipboardPayload(const QString &kind, const QString &mimeType,
+                                           const QByteArray &content)
+{
+    if (m_backend)
+        m_backend->captureClipboardPayload(kind, mimeType, content);
 }
 
 void PickerService::Hide()

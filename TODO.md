@@ -2,23 +2,23 @@
 
 ## Product contract
 
-- [ ] Build the picker UI with Qt 6.11 and QML; use C++ for persistence and desktop integration.
-- [ ] Support GNOME Wayland and X11 in the first release. Use Linux `Super` as the requested Windows/Cmd key.
-- [ ] Make `Super+.` open the emoji view and `Super+V` open clipboard history from other applications.
-- [ ] Paste the selected emoji or history item into the previously focused application when possible.
+- [x] Build the picker UI with Qt 6.11 and QML; use C++ for persistence and desktop integration.
+- [x] Support GNOME Wayland and X11 in the first release. Use Linux `Super` as the requested Windows/Cmd key.
+- [x] Make `Super+.` open the emoji view and `Super+V` open clipboard history from other applications.
+- [x] Paste the selected emoji or history item into the previously focused application when possible.
 - [x] Keep at most **5 pinned clipboard items plus 20 unpinned clipboard items**. Both groups survive app and system restarts; pinned items stay until explicitly unpinned or deleted.
-- [ ] Save emoji recents across restarts. Record ordinary clipboard text and images, excluding file cut/copy operations.
+- [x] Save emoji recents across restarts. Record ordinary clipboard text and images, excluding file cut/copy operations.
 - [x] Keep all history local to the current Linux account. Provide pause, delete, and clear actions.
 
 ## 1. Prove the desktop integration first
 
 - [x] Create a minimal GNOME Shell extension prototype that receives `Meta.Selection::owner-changed` events while another Wayland application has focus. Verify text and image copies from GTK, Qt Wayland, and XWayland applications. (All three passed in isolated GNOME 50.1; the Qt Wayland test uses a painted, focused window and a fresh input event before each copy.)
-- [x] Prove that the extension can call a resident Qt process over the session D-Bus and that a clipboard event received before the Qt process starts can activate it. (A GTK Wayland copy activated the hidden Qt service from no owner in an isolated session; payload transfer is still pending.)
+- [x] Prove that the extension can call a resident Qt process over the session D-Bus and that a clipboard event received before the Qt process starts can activate it. (A GTK Wayland copy activated the hidden Qt service from no owner in an isolated session; the GNOME 50.1 extension now forwards bounded text/image payloads over session D-Bus.)
 - [x] Prove `Super+.` and `Super+V` can be registered after the existing IBus emoji and GNOME message-tray bindings are released. (Both opened the correct Qt view from a focused GTK window in an isolated GNOME 50.1 session; extension defaults remain disabled until guided setup.)
 - [x] Prove the extension can remember the focused window, show a Qt window, restore the target window, and send the appropriate paste shortcut. Test a normal text field and a terminal. (GNOME 50.1: GTK 4 entry received `Ctrl+V`; a VTE terminal with `org.gnome.Ptyxis` app ID received `Ctrl+Shift+V` in the isolated session.)
 - [x] Test temporary emoji clipboard replacement followed by restoration of prior text and image content. Never restore over a newer copy made by the user; record cases where restoration cannot be guaranteed. (GNOME 50.1: prior UTF-8 text and PNG image were restored by Shell; newer copies with different and identical emoji content were kept. Restore is skipped if the prior format cannot be read, a clipboard owner change is observed, or the current clipboard no longer contains the temporary emoji. Paste acceptance cannot be confirmed for every target; the 750 ms wait is a best-effort interval.)
 - [x] Prove X11 clipboard change monitoring through XFixes and global shortcut/paste behavior through X11 key grabs and XTest. (Automated Xvfb test uses a separate Qt target process: text/image clipboard owner changes, both Super shortcuts, ordinary Ctrl+V paste, and terminal Ctrl+Shift+V paste pass.)
-- [x] Record the tested GNOME Shell versions and any version-specific API branches. Test GNOME 50 on the current machine first. (GNOME Shell 50.1 tested; the extension currently targets only version 50 and has no version branches.)
+- [x] Record the tested GNOME Shell versions and any version-specific API branches. Test GNOME 50 on the current machine first. (GNOME Shell 50.1 tested; the extension uses `global.context.get_wayland_compositor()` on this version and has no version branches.)
 
 ## 2. Create the Qt application foundation
 
@@ -62,7 +62,7 @@
 
 ## 6. Finish Wayland and X11 paste flows
 
-- [x] On GNOME Wayland, the extension captures the target when a shortcut fires and activates Qt. Qt puts the selected text/image on the clipboard and asks Shell to restore focus and paste. (GTK entry and terminal behavior passed in the earlier isolated GNOME 50.1 test; the updated D-Bus mode/cancel contract passes an isolated-bus test. Live retest remains in section 8.)
+- [x] On GNOME Wayland, the extension captures the target when a shortcut fires and activates Qt. Qt puts the selected text/image on the clipboard and asks Shell to restore focus and paste. (A disposable GNOME 50.1 session retested Qt Wayland, GTK Wayland, XWayland, and a terminal-style target; Shell activation also restores picker focus when it was already visible.)
 - [x] On X11, capture the active window before showing the picker, then hide the picker, restore the target through an EWMH window-manager request (direct focus fallback without one), and synthesize paste using XTest. (Xvfb integration test passes.)
 - [x] Use `Ctrl+V` for ordinary applications and `Ctrl+Shift+V` for recognized terminals, with a persistent override in the Clipboard view. (Both X11 and GNOME pass the selected mode to their paste path.)
 - [x] For a clipboard-history selection, make the selected item current and paste it. Touch its recent position without changing its pin state. (Xvfb tests text/image paste and pinned history use.)
@@ -81,9 +81,9 @@
 ## 8. Verification and release checklist
 
 - [x] Run a clean CMake build with Qt 6.11.1, `qmllint`, and automated storage/model tests.
-- [ ] Test 6th pin rejection; 21st unpinned eviction; recopy of pinned and unpinned entries; unpin at capacity; deletion; clear recent; pause/resume; and persistence after app restart and logout/login. (Automated tests cover each storage/controller case and reopening SQLite; a real logout/login check remains.)
+- [ ] Test 6th pin rejection; 21st unpinned eviction; recopy of pinned and unpinned entries; unpin at capacity; deletion; clear recent; pause/resume; and persistence after app restart and logout/login. (Automated tests cover each storage/controller case and reopening SQLite. History and emoji recents also survived a fresh disposable GNOME Shell, D-Bus, and Qt session; a real installed-session logout/login check remains.)
 - [x] Test UTF-8 text, multiline text, duplicate text, PNG/JPEG images, unsupported file-copy MIME types, oversized content, and corrupted or outdated database recovery. (Qt tests cover these inputs, version 0 migration, corrupt files, and rejection of newer schemas.)
-- [ ] On GNOME Wayland, test both shortcuts from GTK, Qt Wayland, XWayland, and terminal windows; verify focus restoration, paste, image previews, and clipboard preservation behavior. (Existing D-Bus contract tests pass. A fresh headless GNOME 50.1 test session currently aborts because the host `org.gnome.desktop.privacy` schema lacks `privacy-screen`; live retest remains.)
+- [x] On GNOME Wayland, test both shortcuts from GTK, Qt Wayland, XWayland, and terminal windows; verify focus restoration, paste, image previews, and clipboard preservation behavior. (The disposable GNOME 50.1 run passes GTK, Qt Wayland, XWayland, and a GTK terminal-style target, plus text/image capture, emoji and history-image paste, prior text/image restoration, and a rendered thumbnail. An earlier isolated test used a VTE terminal. The inherited Snap GSettings path caused the earlier headless startup failure; the test now uses system schemas in its private profile.)
 - [x] On X11, test XFixes capture, shortcut grabs, text/image paste, and startup in a separate X11 session or automated Xvfb harness. (Automated Xvfb test passes with a separate target process; the compiled picker also passes an X11 smoke launch.)
 - [x] Test both shortcut-conflict setup and uninstall restoration, including the case where the user changes a binding after installation. (An isolated real GSettings keyfile run verifies install, guided setup, preservation of other shortcuts, user edits, and uninstall restoration without changing the current profile.)
 - [x] Verify no clipboard payload appears in logs, no data is sent over the network, file permissions are user-only, and failures are explained in the UI. (Synthetic-payload log test, source audit for network calls, private-file tests, and controller/X11 failure tests pass; Shell warnings use fixed messages.)

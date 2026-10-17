@@ -227,7 +227,7 @@ void DesktopIntegrationTest::repeatedActivationTogglesAndSwitches()
     QCOMPARE(backend.rememberCount, 2);
     QVERIFY(backend.targetArmed);
 
-    QCOMPARE(service.ShowFromShortcut(QStringLiteral("clipboard"), true), pid);
+    QCOMPARE(service.ShowFromShortcut(QStringLiteral("clipboard"), true), 0u);
     QVERIFY(!service.IsVisible());
     QCOMPARE(backend.cancelCount, 1);
     QVERIFY(!backend.targetArmed);

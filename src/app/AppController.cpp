@@ -287,12 +287,29 @@ QString AppController::initialView() const
 
 bool AppController::backgroundCaptureLimited() const
 {
-    return qEnvironmentVariable("XDG_SESSION_TYPE") == QLatin1String("wayland");
+    return qEnvironmentVariable("XDG_SESSION_TYPE") == QLatin1String("wayland")
+        && m_copyOnly;
 }
 
 void AppController::captureNow()
 {
     captureCurrentClipboard();
+}
+
+void AppController::capturePayload(const QString &kind, const QString &mimeType,
+                                   const QByteArray &content)
+{
+    QMimeData mime;
+    if (kind == QStringLiteral("text")
+        && (mimeType == QStringLiteral("text/plain")
+            || mimeType == QStringLiteral("text/plain;charset=utf-8"))) {
+        mime.setText(QString::fromUtf8(content));
+    } else if (kind == QStringLiteral("image") && mimeType.startsWith(QLatin1String("image/"))) {
+        mime.setData(mimeType, content);
+    } else {
+        return;
+    }
+    captureMimeData(&mime);
 }
 
 void AppController::copyEmoji(const QString &symbol)
@@ -545,10 +562,16 @@ void AppController::snapshotClipboardBeforeEmoji(const QString &symbol)
 
 void AppController::captureCurrentClipboard()
 {
+    captureMimeData(m_clipboard->mimeData());
+}
+
+void AppController::captureMimeData(const QMimeData *mime)
+{
     if (m_paused || !m_store->isOpen())
         return;
-    const QMimeData *mime = m_clipboard->mimeData();
     if (!mime)
+        return;
+    if (mime->formats().isEmpty())
         return;
     if (privateClipboard(mime)) {
         setStatus(tr("Private clipboard item was skipped"));
