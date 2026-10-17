@@ -49,14 +49,18 @@ T.Button {
             }
             Text {
                 anchors.fill: parent
+                anchors.margins: control.compact ? Theme.fontSize(4) : 0
                 visible: !control.renderable
-                text: qsTr("No glyph")
+                text: control.compact ? control.emojiName : qsTr("No glyph")
                 color: Theme.accent
                 font.family: Theme.bodyFamily
-                font.pixelSize: Theme.fontSize(11)
+                font.pixelSize: Theme.fontSize(control.compact ? 10 : 11)
                 font.weight: Font.DemiBold
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
+                wrapMode: Text.Wrap
+                maximumLineCount: control.compact ? 3 : 1
+                elide: Text.ElideRight
                 Accessible.ignored: true
             }
         }

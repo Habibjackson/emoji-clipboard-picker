@@ -81,7 +81,7 @@ Some empty directories retain `.gitkeep` files for future modules.
 
 The catalog is a pinned copy of Unicode's `emoji-test.txt` version 18.0, with English names and search keywords from CLDR 48.2. Their sources, checksums, and separate Unicode License v3 notice are in [resources/emoji/README.md](resources/emoji/README.md). Emoji artwork is rendered by installed system fonts; no artwork is bundled.
 
-Tiles marked ▾ open a skin tone chooser. Selecting a tile in Recents copies its saved sequence directly. Qt uses the system emoji font; when shaping finds a missing glyph or an uncombined sequence, the tile shows **No glyph** and its name while still allowing copy. Font support can vary between applications and after a font update, so this check reflects the picker's current font configuration.
+Tiles marked ▾ open a skin tone chooser. Selecting a tile in Recents copies its saved sequence directly. Qt uses the system emoji font; when shaping finds a missing glyph or an uncombined sequence, compact tiles show the emoji's name while still allowing copy. Font support can vary between applications and after a font update, so this check reflects the picker's current font configuration.
 
 ## Contributing and license
 

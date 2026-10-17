@@ -219,6 +219,7 @@ T.ApplicationWindow {
         x: window.width - width - Theme.fontSize(12)
         y: Theme.fontSize(58)
         width: Math.min(Theme.fontSize(232), window.width - Theme.fontSize(24))
+        height: actionsContent.implicitHeight + topPadding + bottomPadding
         padding: Theme.fontSize(8)
         focus: true
         closePolicy: T.Popup.CloseOnEscape | T.Popup.CloseOnPressOutside
@@ -231,6 +232,7 @@ T.ApplicationWindow {
             border.width: 1
         }
         contentItem: ColumnLayout {
+            id: actionsContent
             spacing: Theme.fontSize(3)
 
             ActionButton {
@@ -287,6 +289,7 @@ T.ApplicationWindow {
         x: window.width - width - Theme.fontSize(12)
         y: Theme.fontSize(58)
         width: Math.min(Theme.fontSize(208), window.width - Theme.fontSize(24))
+        height: pasteChoices.implicitHeight + topPadding + bottomPadding
         padding: Theme.fontSize(8)
         focus: true
         closePolicy: T.Popup.CloseOnEscape | T.Popup.CloseOnPressOutside
@@ -299,6 +302,7 @@ T.ApplicationWindow {
             border.width: 1
         }
         contentItem: ColumnLayout {
+            id: pasteChoices
             spacing: Theme.fontSize(3)
 
             ActionButton {
