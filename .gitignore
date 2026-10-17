@@ -1,0 +1,54 @@
+# Local workspace metadata and credentials
+/.agents/
+/.aws/
+/.codex/
+
+# CMake and Qt build output
+/build/
+/build-*/
+/cmake-build-*/
+/out/
+/dist/
+/CMakeFiles/
+/CMakeCache.txt
+/cmake_install.cmake
+/CTestTestfile.cmake
+/Testing/
+/compile_commands.json
+/.ninja_deps
+/.ninja_log
+/_deps/
+/*_autogen/
+/*.qmlc
+/*.jsc
+/*.rcc
+/*.qm
+/integration/gnome-extension/schemas/gschemas.compiled
+
+# Compiler and editor output
+*.o
+*.obj
+*.a
+*.so
+*.so.*
+*.dylib
+*.exe
+*.user
+*.user.*
+.idea/
+.vscode/
+*.swp
+*~
+
+# Local test/runtime data
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.log
+/coverage/
+/.venv/
+__pycache__/
+.pytest_cache/
+core
+core.*
