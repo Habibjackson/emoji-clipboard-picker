@@ -1,0 +1,14 @@
+[Unit]
+Description=Emoji Keyboard clipboard history and picker
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=dbus
+BusName=org.emojikeyboard.App
+ExecStart=@EMOJI_KEYBOARD_EXECUTABLE@ --background
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

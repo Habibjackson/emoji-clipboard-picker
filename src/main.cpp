@@ -17,9 +17,15 @@
 #include <QDebug>
 #include <QGuiApplication>
 #include <QIcon>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QQuickWindow>
 #include <QQmlApplicationEngine>
+#include <QSettings>
+#include <QStandardPaths>
 #include <QTimer>
+
+#include <cstdio>
 
 #include <memory>
 
@@ -72,12 +78,27 @@ int main(int argc, char *argv[])
     const QCommandLineOption screenshotOption(QStringLiteral("screenshot"),
                                              QStringLiteral("Save the window as a PNG and exit"),
                                              QStringLiteral("path"));
+    const QCommandLineOption dataPathsOption(QStringLiteral("print-data-paths"),
+                                             QStringLiteral("Print local history and settings paths as JSON"));
     parser.addOption(clipboardOption);
     parser.addOption(backgroundOption);
     parser.addOption(quitOption);
     parser.addOption(smokeOption);
     parser.addOption(screenshotOption);
+    parser.addOption(dataPathsOption);
     parser.process(app);
+
+    if (parser.isSet(dataPathsOption)) {
+        const QJsonObject paths {
+            { QStringLiteral("historyDirectory"),
+              QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) },
+            { QStringLiteral("settingsFile"), QSettings().fileName() }
+        };
+        const QByteArray output = QJsonDocument(paths).toJson(QJsonDocument::Compact);
+        std::fwrite(output.constData(), 1, size_t(output.size()), stdout);
+        std::fputc('\n', stdout);
+        return 0;
+    }
 
     auto bus = QDBusConnection::sessionBus();
     const bool busAvailable = bus.isConnected() && bus.interface();

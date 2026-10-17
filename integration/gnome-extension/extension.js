@@ -46,6 +46,10 @@ const INTERFACE_XML = `
 
 export default class EmojiKeyboardExtension extends Extension {
     enable() {
+        // The native X11 backend owns clipboard monitoring and key grabs there.
+        this._inactiveOnX11 = !Meta.is_wayland_compositor();
+        if (this._inactiveOnX11)
+            return;
         this._counts = {total: 0, text: 0, image: 0, other: 0};
         this._reportedActivationError = false;
         this._clipboardRevision = 0;
@@ -78,6 +82,10 @@ export default class EmojiKeyboardExtension extends Extension {
     }
 
     disable() {
+        if (this._inactiveOnX11) {
+            this._inactiveOnX11 = false;
+            return;
+        }
         this._pasteGeneration++;
         this._targetWindow = null;
         this._openClipboardRevision = null;

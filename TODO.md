@@ -71,12 +71,12 @@
 
 ## 7. Setup, startup, and removal
 
-- [ ] Provide an idempotent user-level installer for the binary, desktop entry, GNOME extension, session D-Bus activation, and a systemd user service that starts at login and restarts after a crash.
-- [ ] In a guided setup step, explain that this machine currently uses `Super+.` for IBus emoji input and `Super+V` for GNOME's message tray. Ask once before changing either setting.
-- [ ] Save the original shortcut arrays; remove only the conflicting combinations, leaving other IBus and message-tray shortcuts intact. Restore each original value on uninstall only if the user has not changed it since setup.
-- [ ] Register the two GNOME extension keybindings, report conflicts, and offer a recheck action. On X11, report a failed key grab instead of claiming the shortcut works.
-- [ ] Document the GNOME logout/login needed when first installing an extension, and provide clear extension/service status checks.
-- [ ] Make uninstall disable the extension and service, remove installed integration files, restore eligible shortcuts, and offer a separate explicit choice to keep or purge the history database.
+- [x] Provide an idempotent user-level installer for the binary, desktop entry, GNOME extension, session D-Bus activation, and a systemd user service that starts at login and restarts after a crash. (`scripts/emoji_keyboard.py install` copies the existing build and tracks managed file hashes.)
+- [x] In a guided setup step, explain that this machine currently uses `Super+.` for IBus emoji input and `Super+V` for GNOME's message tray. Ask once before changing either setting. (A noninteractive install leaves conflicting settings untouched.)
+- [x] Save the original shortcut arrays; remove only the conflicting combinations, leaving other IBus and message-tray shortcuts intact. Restore each original value on uninstall only if the user has not changed it since setup. (Installer tests cover idempotence, preservation, and user edits.)
+- [x] Register the two GNOME extension keybindings, report conflicts, and offer a recheck action. On X11, report a failed key grab instead of claiming the shortcut works. (`setup-shortcuts` sets extension bindings after known conflicts clear; `recheck` reports their status. X11 already reports failed grabs in the picker.)
+- [x] Document the GNOME logout/login needed when first installing an extension, and provide clear extension/service status checks. (README and `status`/`recheck` commands.)
+- [x] Make uninstall disable the extension and service, remove installed integration files, restore eligible shortcuts, and offer a separate explicit choice to keep or purge the history database. (`uninstall --purge-history` is explicit; default keeps history.)
 
 ## 8. Verification and release checklist
 
@@ -87,7 +87,7 @@
 - [x] On X11, test XFixes capture, shortcut grabs, text/image paste, and startup in a separate X11 session or automated Xvfb harness. (Automated Xvfb test passes with a separate target process; the compiled picker also passes an X11 smoke launch.)
 - [ ] Test both shortcut-conflict setup and uninstall restoration, including the case where the user changes a binding after installation.
 - [ ] Verify no clipboard payload appears in logs, no data is sent over the network, file permissions are user-only, and failures are explained in the UI.
-- [ ] Write README instructions for build, install, use, troubleshooting, supported desktops, known paste/restoration limits, and data removal.
+- [x] Write README instructions for build, install, use, troubleshooting, supported desktops, known paste/restoration limits, and data removal.
 
 ## Technical references
 

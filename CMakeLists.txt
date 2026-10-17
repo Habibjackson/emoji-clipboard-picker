@@ -114,6 +114,11 @@ install(FILES resources/icons/org.emojikeyboard.App.svg
 include(CTest)
 if(BUILD_TESTING)
     find_package(Qt6 6.11 REQUIRED COMPONENTS Test)
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME setup_installer COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/tst_setup.py")
+    endif()
     qt_add_executable(tst_history_store
         tests/unit/tst_history_store.cpp
         src/storage/HistoryStore.cpp

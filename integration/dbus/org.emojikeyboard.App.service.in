@@ -1,3 +1,4 @@
 [D-BUS Service]
 Name=org.emojikeyboard.App
 Exec=@EMOJI_KEYBOARD_EXECUTABLE@ --background
+SystemdService=emoji-keyboard.service

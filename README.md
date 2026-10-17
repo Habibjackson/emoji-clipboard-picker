@@ -1,6 +1,6 @@
 # Emoji Keyboard for Linux
 
-Qt 6.11/QML emoji picker with local clipboard history. This first version lets you browse 3,963 Unicode Emoji 18.0 entries by category, search by English name or CLDR keyword, copy emoji, and keep recently used emoji. Skin tone sequences sit behind a chooser, while Recents keep the exact selection. It saves copied text and images across restarts, with up to five permanent pins and twenty unpinned items. The remaining desktop integration work is tracked in [TODO.md](TODO.md).
+Qt 6.11/QML emoji picker with local clipboard history. Browse 3,963 Unicode Emoji 18.0 entries by category, search by English name or CLDR keyword, and keep recently used emoji. Skin tone sequences sit behind a chooser, while Recents keep the exact selection. Copied text and images survive restarts, with up to five permanent pins and twenty unpinned items. Remaining verification is tracked in [TODO.md](TODO.md).
 
 ## Build
 
@@ -20,15 +20,40 @@ Run `./build/emoji-keyboard --clipboard` to open the history view directly. The 
 
 On Linux, the app defaults to Qt's generic platform theme because its custom QML controls do not use GTK styling. This avoids a GTK/GSettings startup crash when launched from some Snap-hosted IDE terminals. An explicit `QT_QPA_PLATFORMTHEME` value still takes precedence.
 
-Clipboard monitoring uses Qt's clipboard notifications while the application runs. GNOME Wayland may not expose copies made while this window is unfocused; use **Capture current** after returning to the picker to save the current clipboard item. A GNOME Shell 50 development extension in [`integration/gnome-extension/`](integration/gnome-extension/README.md) detects clipboard owner changes, starts the hidden picker through session D-Bus, and registers `Super+.` / `Super+V` bindings. When opened by a registered shortcut, the picker returns focus to the prior window and sends `Ctrl+V`, or `Ctrl+Shift+V` for recognized terminals. In the Clipboard view, **Paste shortcut** can override detection with either key combination; the choice persists across restarts. The bindings default to disabled until guided setup can release existing GNOME shortcuts. No shortcut settings are changed by this version.
+Clipboard monitoring uses Qt's clipboard notifications while the application runs. GNOME Wayland may not expose copies made while this window is unfocused; use **Capture current** after returning to the picker to save the current clipboard item. A GNOME Shell 50 extension in [`integration/gnome-extension/`](integration/gnome-extension/README.md) detects clipboard owner changes, starts the hidden picker through session D-Bus, and registers `Super+.` / `Super+V` bindings. When opened by a registered shortcut, the picker returns focus to the prior window and sends `Ctrl+V`, or `Ctrl+Shift+V` for recognized terminals. In the Clipboard view, **Paste shortcut** can override detection with either key combination; the choice persists across restarts. The bindings default to disabled until guided setup releases existing GNOME shortcuts.
 
-After an automatic emoji paste, the GNOME extension restores prior plain text or PNG clipboard content after 750 ms if the temporary emoji is still current and no clipboard owner change was observed. A newer copy is left untouched, even if it contains the same emoji. Unsupported, oversized, or unreadable prior content cannot be restored; the emoji then stays copied. Some applications may read the clipboard later than the delay and receive the restored prior content. The extension cannot confirm that every target accepted the paste. The development bridge does not yet capture full clipboard payloads in the background.
+After an automatic emoji paste, the GNOME extension restores prior plain text or PNG clipboard content after 750 ms if the temporary emoji is still current and no clipboard owner change was observed. A newer copy is left untouched, even if it contains the same emoji. Unsupported, oversized, or unreadable prior content cannot be restored; the emoji then stays copied. Some applications may read the clipboard later than the delay and receive the restored prior content. The extension cannot confirm that every target accepted the paste. The bridge asks the resident Qt process to read clipboard payloads; some applications and formats may still be unavailable to it.
 
 On X11, the optional backend watches clipboard ownership through XFixes and grabs `Super+.` and `Super+V` to open the matching view. It asks an EWMH window manager to restore the target, or restores focus directly when no compatible manager is present, then sends paste through XTest. A failed shortcut grab appears in a persistent picker notice. After a successful emoji paste, it restores prior plain text or PNG content after 750 ms only if the temporary emoji and clipboard owner are unchanged. The Xvfb test covers text/image capture and paste, shortcuts, restoration, cancellation, and newer-copy preservation. Automatic paste and restoration are best effort; if the target vanishes, the selected item remains copied for manual paste.
 
 If native integration or the GNOME extension is unavailable, the picker shows a copy-only notice. Selecting an emoji or history item still copies it, ready for manual paste. The GNOME notice clears when its extension starts and returns if it stops.
 
-The app uses the desktop ID `org.emojikeyboard.App`. `cmake --install build --prefix "$HOME/.local"` installs its launcher and icon with the binary; setup of the GNOME extension and background service is tracked separately in [TODO.md](TODO.md).
+## Install and shortcuts
+
+After building in the existing `build/` directory, run:
+
+```sh
+python3 scripts/emoji_keyboard.py install
+python3 scripts/emoji_keyboard.py status
+```
+
+The installer copies the binary to `~/.local/bin`, installs the desktop entry, icon, D-Bus activation file, GNOME extension and compiled schema under `~/.local/share`, and enables a `systemd --user` service. The service starts with `graphical-session.target` and restarts after a crash. The binary still needs Qt 6.11 runtime libraries on this machine. If the compiled binary lives elsewhere, pass `install --binary /path/to/emoji-keyboard`. Repeating `install` updates managed files; it refuses to overwrite a file edited outside the installer.
+
+Guided setup shows the current IBus `Super+.` and GNOME message-tray `Super+V` arrays and asks **once** before removing those two combinations. Other shortcuts in those arrays remain. It then enables the extension's two bindings and saves the originals in a private installer-state file. In a noninteractive terminal, conflicting shortcuts stay unchanged; run `python3 scripts/emoji_keyboard.py setup-shortcuts` later. Use `install --no-shortcuts` to install without this step. `setup-shortcuts --yes` is an explicit noninteractive choice.
+
+On GNOME Wayland, log out and log back in after installing a new extension so Shell discovers it. If Shell cannot activate it immediately, the installer queues its UUID in GNOME's enabled list for the next login while keeping other extensions. Check it with `gnome-extensions info emoji-keyboard@emojikeyboard.local`; check the service with `systemctl --user status emoji-keyboard.service`. Run `python3 scripts/emoji_keyboard.py recheck` to inspect known conflicts and whether the extension/service are active. If a shortcut still fails, check other extensions or custom GNOME bindings. On X11, the native backend handles key grabs and reports failures in the picker; the GNOME extension stays inactive there. `recheck` cannot prove that another X11 client will not grab a key later, so press both shortcuts from another application.
+
+The installer changes the IBus and message-tray shortcut arrays only during its guided shortcut step. It does not need root privileges. GNOME Shell 50.1 and the optional X11 backend are the current tested targets; other Wayland compositors are not supported yet.
+
+## Remove and local data
+
+```sh
+python3 scripts/emoji_keyboard.py uninstall
+# Explicitly delete the saved history database too:
+python3 scripts/emoji_keyboard.py uninstall --purge-history
+```
+
+Uninstall disables the extension and service, removes unchanged managed files, and restores each shortcut array only if its current value still matches the value setup applied. User-edited arrays and installed files are kept and reported. By default, the SQLite history database is kept; `--purge-history` deletes it and its SQLite sidecars. The command can be run again after a keep-history uninstall; private installer state remains so it knows the history path. To see the exact Qt history and settings paths, run `./build/emoji-keyboard --print-data-paths`. The separate Qt settings file stores the paste shortcut preference and is not part of the history purge.
 
 History is stored in SQLite under Qt's user-specific `AppDataLocation` with a private directory and database file. Text is capped at 1 MiB and encoded images at 10 MiB. File copy operations and recognized secret-marked content are skipped. The application makes no network requests.
 
@@ -48,7 +73,7 @@ History is stored in SQLite under Qt's user-specific `AppDataLocation` with a pr
 | `tests/unit/`, `tests/integration/` | Model/storage tests and desktop integration tests |
 | `scripts/`, `docs/` | Development tools and design/operational notes |
 
-The `.gitkeep` files preserve directories until their implementations are added.
+Some empty directories retain `.gitkeep` files for future modules.
 
 ## Emoji data
 
