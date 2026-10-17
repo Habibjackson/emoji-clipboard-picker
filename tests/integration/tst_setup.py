@@ -2,8 +2,12 @@
 
 import importlib.util
 import io
+import json
 import os
 from pathlib import Path
+import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -156,6 +160,71 @@ class SetupTests(unittest.TestCase):
             self.assertEqual(arrays, ["another@example.org", setup.UUID])
             setup.remove_enabled_extension()
         self.assertEqual(arrays, ["another@example.org"])
+
+    def test_real_gsettings_round_trip_in_isolated_keyfile(self):
+        (self.paths["extension"] / "schemas/gschemas.compiled").unlink()
+        if not shutil.which("gsettings") or not shutil.which("glib-compile-schemas"):
+            self.skipTest("GSettings tools are unavailable")
+        schemas = subprocess.run(["gsettings", "list-schemas"], text=True,
+                                 capture_output=True, check=False).stdout.splitlines()
+        required = {"org.gnome.shell", "org.gnome.shell.keybindings",
+                    "org.freedesktop.ibus.panel.emoji"}
+        if not required.issubset(schemas):
+            self.skipTest("GNOME and IBus schemas are unavailable")
+
+        child_env = os.environ.copy()
+        child_env["GSETTINGS_BACKEND"] = "keyfile"
+        child_env["XDG_CURRENT_DESKTOP"] = "GNOME"
+        child_env["XDG_SESSION_TYPE"] = "wayland"
+        child_env["HOME"] = str(self.home)
+        fake_commands = self.home / "fake-commands"
+        fake_commands.mkdir()
+        child_env["PATH"] = f"{fake_commands}:{child_env['PATH']}"
+        for name, status in (("systemctl", 0), ("gnome-extensions", 1)):
+            command = fake_commands / name
+            command.write_text(f"#!/bin/sh\nexit {status}\n")
+            command.chmod(0o755)
+
+        history = self.home / "history"
+        fake_binary = self.home / "build/emoji-keyboard"
+        fake_binary.parent.mkdir()
+        fake_binary.write_text("#!/bin/sh\nprintf '%s\\n' '" + json.dumps({
+            "historyDirectory": str(history),
+            "settingsFile": str(self.home / "settings.ini"),
+        }) + "'\n")
+        fake_binary.chmod(0o755)
+
+        def gsettings(*arguments):
+            return subprocess.run(["gsettings", *arguments], env=child_env, text=True,
+                                  capture_output=True, check=True).stdout.strip()
+
+        gsettings("set", "org.freedesktop.ibus.panel.emoji", "hotkey",
+                  '["<Super>period", "<Super>semicolon"]')
+        gsettings("set", "org.gnome.shell.keybindings", "toggle-message-tray",
+                  '["<Super>v", "<Super>m"]')
+
+        def installer(*arguments):
+            result = subprocess.run([sys.executable, str(SCRIPT), *arguments], env=child_env,
+                                    text=True, capture_output=True, check=False)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+        installer("install", "--binary", str(fake_binary), "--no-shortcuts")
+        installer("setup-shortcuts", "--yes")
+        self.assertEqual(gsettings("get", "org.freedesktop.ibus.panel.emoji", "hotkey"),
+                         "['<Super>semicolon']")
+        self.assertEqual(gsettings("get", "org.gnome.shell.keybindings", "toggle-message-tray"),
+                         "['<Super>m']")
+        extension_schema = str(self.paths["extension"] / "schemas")
+        self.assertEqual(gsettings("--schemadir", extension_schema, "get", setup.GNOME_SCHEMA,
+                                   "show-emoji"), "['<Super>period']")
+        gsettings("set", "org.gnome.shell.keybindings", "toggle-message-tray",
+                  '["<Super>n"]')
+        installer("uninstall")
+        self.assertEqual(gsettings("get", "org.freedesktop.ibus.panel.emoji", "hotkey"),
+                         "['<Super>period', '<Super>semicolon']")
+        self.assertEqual(gsettings("get", "org.gnome.shell.keybindings", "toggle-message-tray"),
+                         "['<Super>n']")
+        self.assertFalse(self.paths["bin"].exists())
 
 
 def subprocess_result(output):
