@@ -113,6 +113,9 @@ if(BUILD_TESTING)
         add_test(NAME gnome_clipboard_probe
             COMMAND "${GJS_EXECUTABLE}" -m
                 "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/tst_gnome_clipboard_probe.js")
+        add_test(NAME gnome_paste_shortcut
+            COMMAND "${GJS_EXECUTABLE}" -m
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/tst_gnome_paste_shortcut.js")
     endif()
 
     find_program(GLIB_COMPILE_SCHEMAS_EXECUTABLE NAMES glib-compile-schemas)

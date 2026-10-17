@@ -4,6 +4,7 @@
 #include "models/EmojiModel.h"
 
 #include <QByteArray>
+#include <QImage>
 #include <QObject>
 #include <QtQml/qqmlregistration.h>
 
@@ -23,6 +24,8 @@ class AppController : public QObject
     Q_PROPERTY(bool backgroundCaptureLimited READ backgroundCaptureLimited CONSTANT)
 
 public:
+    enum class ClipboardRestoreResult { Restored, Unavailable, Changed };
+
     explicit AppController(HistoryStore *store, QString initialView, QObject *parent = nullptr);
 
     EmojiModel *emojiModel();
@@ -39,6 +42,13 @@ public:
     Q_INVOKABLE void pinEntry(qint64 id, bool pinned);
     Q_INVOKABLE void deleteEntry(qint64 id);
     Q_INVOKABLE void clearRecent();
+    void reportPasteResult(const QString &result, const QString &shortcut);
+    void reportClipboardRestoreResult(ClipboardRestoreResult result);
+    bool hasEmojiClipboardSnapshot() const;
+    quint64 emojiClipboardSnapshotGeneration() const;
+    bool emojiClipboardSnapshot(QString *temporaryText, QString *mimeType,
+                                QByteArray *content) const;
+    void discardEmojiClipboardSnapshot();
 
 signals:
     void itemCopied();
@@ -47,6 +57,7 @@ signals:
 
 private:
     void captureCurrentClipboard();
+    void snapshotClipboardBeforeEmoji(const QString &symbol);
     void setStatus(const QString &message);
     bool isOwnClipboardContent(const QString &kind, const QByteArray &content);
     static QByteArray contentHash(const QString &kind, const QByteArray &content);
@@ -58,5 +69,11 @@ private:
     QString m_initialView;
     QString m_status;
     QByteArray m_ownContentHash;
+    enum class SnapshotKind { None, Text, Image };
+    SnapshotKind m_snapshotKind = SnapshotKind::None;
+    QString m_snapshotText;
+    QImage m_snapshotImage;
+    QString m_temporaryEmoji;
+    quint64 m_snapshotGeneration = 0;
     bool m_paused = false;
 };

@@ -15,6 +15,7 @@ class AppControllerTest : public QObject
 
 private slots:
     void capturesAndCopies();
+    void snapshotsSupportedClipboardBeforeEmoji();
 };
 
 void AppControllerTest::capturesAndCopies()
@@ -77,6 +78,36 @@ void AppControllerTest::capturesAndCopies()
     QGuiApplication::clipboard()->setText(QStringLiteral("do not save this"));
     controller.captureNow();
     QCOMPARE(store.entries().size(), 2);
+}
+
+void AppControllerTest::snapshotsSupportedClipboardBeforeEmoji()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QVERIFY2(store.open(), qPrintable(store.errorString()));
+    AppController controller(&store, QStringLiteral("emoji"));
+    auto *clipboard = QGuiApplication::clipboard();
+    QString temporaryText;
+    QString mimeType;
+    QByteArray content;
+
+    clipboard->setText(QStringLiteral("previous text"));
+    controller.copyEmoji(QString::fromUtf8("😀"));
+    QCOMPARE(clipboard->text(), QString::fromUtf8("😀"));
+    QVERIFY(controller.emojiClipboardSnapshot(&temporaryText, &mimeType, &content));
+    QCOMPARE(temporaryText, QString::fromUtf8("😀"));
+    QCOMPARE(mimeType, QStringLiteral("text/plain;charset=utf-8"));
+    QCOMPARE(QString::fromUtf8(content), QStringLiteral("previous text"));
+
+    QImage image(32, 24, QImage::Format_ARGB32);
+    image.fill(Qt::blue);
+    clipboard->setImage(image);
+    controller.copyEmoji(QString::fromUtf8("🎉"));
+    QVERIFY(controller.emojiClipboardSnapshot(&temporaryText, &mimeType, &content));
+    QCOMPARE(temporaryText, QString::fromUtf8("🎉"));
+    QCOMPARE(mimeType, QStringLiteral("image/png"));
+    QCOMPARE(QImage::fromData(content, "PNG"), image);
 }
 
 QTEST_MAIN(AppControllerTest)

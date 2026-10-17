@@ -6,7 +6,7 @@ Build and install the probe with:
 
 ```sh
 gnome-extensions pack integration/gnome-extension --out-dir /tmp -f \
-    --extra-source=clipboardProbe.js
+    --extra-source=clipboardProbe.js --extra-source=pasteShortcut.js
 gnome-extensions install /tmp/emoji-keyboard@emojikeyboard.local.shell-extension.zip
 gnome-extensions enable emoji-keyboard@emojikeyboard.local
 ```
@@ -36,3 +36,5 @@ gdbus call --session --dest org.emojikeyboard.ClipboardProbe \
 Use `ShowClipboard` to open the history view. For a source-tree test, copy the generated `build/org.emojikeyboard.App.service` into `~/.local/share/dbus-1/services/`. It points to the executable in the current build directory. The user-level installer will generate a service file for the final installed path later.
 
 The extension contains `show-emoji` and `show-clipboard` bindings with empty defaults. In an isolated GNOME 50.1 session, removing only `<Super>period` from IBus's emoji hotkey and `<Super>v` from GNOME's message-tray shortcut allowed both bindings to register. Synthetic `Super+.` and `Super+V` presses from a focused GTK window opened the corresponding Qt views. Guided setup and restoration of the original bindings are still pending, so do not change your desktop bindings for this development probe.
+
+For shortcut-opened selections, Shell remembers the focused window, waits for it to regain focus, then sends `Ctrl+V` or `Ctrl+Shift+V` for recognized terminals. The isolated GNOME 50.1 test used a GTK 4 entry and a VTE terminal with the `org.gnome.Ptyxis` app ID. If focus cannot be restored, the item remains copied for manual paste. An emoji selection temporarily replaces the clipboard; Shell restores prior plain text or PNG data after 750 ms only while that emoji is still current and no newer clipboard owner event has occurred. Text, image, and newer-copy preservation, including another copy of the same emoji, passed in the isolated session. Clipboard payloads are transferred only within the user's session D-Bus for restoration, never written to the extension log. The delay cannot guarantee that every target has finished reading the temporary clipboard.
