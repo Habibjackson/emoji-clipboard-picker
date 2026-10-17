@@ -14,8 +14,16 @@ QtObject {
     readonly property color accent: dark ? "#FF8A73" : "#C94F3B"
     readonly property color accentSoft: dark ? "#49332F" : "#F9E7E1"
     readonly property color accentInk: dark ? "#201B19" : "#FFFFFF"
-    readonly property string bodyFamily: "Noto Sans"
+    readonly property string bodyFamily: Application.font.family || "Noto Sans"
+    readonly property real fontScale: Application.font.pointSize > 0
+                                      ? Math.max(1, Application.font.pointSize / 9)
+                                      : Application.font.pixelSize > 0
+                                        ? Math.max(1, Application.font.pixelSize / 12) : 1
     readonly property int radius: 14
     readonly property int smallRadius: 9
-    readonly property int spacing: 12
+    readonly property int spacing: fontSize(12)
+
+    function fontSize(pixels) {
+        return Math.round(pixels * fontScale)
+    }
 }

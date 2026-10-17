@@ -8,8 +8,8 @@ T.Button {
     property string categoryName: ""
 
     text: categoryName
-    implicitHeight: 44
-    implicitWidth: 156
+    implicitHeight: Math.max(44, Theme.fontSize(40))
+    implicitWidth: Theme.fontSize(156)
     hoverEnabled: true
     Accessible.name: categoryName
     Keys.onReturnPressed: control.clicked()
@@ -19,10 +19,10 @@ T.Button {
         text: control.text
         color: control.selected ? Theme.accent : Theme.muted
         font.family: Theme.bodyFamily
-        font.pixelSize: 13
+        font.pixelSize: Theme.fontSize(13)
         font.weight: control.selected ? Font.DemiBold : Font.Medium
         verticalAlignment: Text.AlignVCenter
-        leftPadding: 14
+        leftPadding: Theme.fontSize(14)
         elide: Text.ElideRight
     }
     background: Rectangle {

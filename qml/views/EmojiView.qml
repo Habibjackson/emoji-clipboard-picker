@@ -8,18 +8,21 @@ Item {
     id: view
 
     required property AppController controller
+    readonly property bool compact: width < Theme.fontSize(420)
 
     Component.onCompleted: search.forceActiveFocus()
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: 16
+        spacing: Theme.fontSize(view.compact ? 8 : 16)
 
         ColumnLayout {
             Layout.fillWidth: true
-            spacing: 4
+            spacing: Theme.fontSize(4)
 
             Text {
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
                 text: view.controller.emojiModel.query.length > 0
                       ? qsTr("Search results")
                       : view.controller.emojiModel.category === "All"
@@ -27,14 +30,19 @@ Item {
                         : view.controller.emojiModel.category
                 color: Theme.ink
                 font.family: Theme.bodyFamily
-                font.pixelSize: 26
+                font.pixelSize: Theme.fontSize(26)
                 font.weight: Font.Bold
+                wrapMode: Text.Wrap
             }
             Text {
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                visible: !view.compact
                 text: qsTr("Choose an emoji to copy. Tiles marked ▾ offer skin tones.")
                 color: Theme.muted
                 font.family: Theme.bodyFamily
-                font.pixelSize: 13
+                font.pixelSize: Theme.fontSize(13)
+                wrapMode: Text.Wrap
             }
         }
 
@@ -53,14 +61,15 @@ Item {
                 text: qsTr("%1 choices").arg(view.controller.emojiModel.resultCount)
                 color: Theme.muted
                 font.family: Theme.bodyFamily
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontSize(12)
             }
             Item { Layout.fillWidth: true }
             Text {
+                visible: !view.compact
                 text: qsTr("PICK · ▾ FOR TONES")
                 color: Theme.accent
                 font.family: Theme.bodyFamily
-                font.pixelSize: 10
+                font.pixelSize: Theme.fontSize(10)
                 font.weight: Font.Bold
                 font.letterSpacing: 1.3
             }
@@ -71,8 +80,8 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            cellWidth: 80
-            cellHeight: 80
+            cellWidth: Theme.fontSize(80)
+            cellHeight: Theme.fontSize(80)
             model: view.controller.emojiModel
             reuseItems: true
             boundsBehavior: Flickable.StopAtBounds
@@ -80,8 +89,8 @@ Item {
             KeyNavigation.backtab: search
 
             delegate: EmojiTile {
-                width: grid.cellWidth - 8
-                height: grid.cellHeight - 8
+                width: grid.cellWidth - Theme.fontSize(8)
+                height: grid.cellHeight - Theme.fontSize(8)
                 focus: GridView.isCurrentItem
                 onPicked: symbol => view.controller.copyEmoji(symbol)
                 onVariantsRequested: (symbol, emojiName) => {
@@ -100,7 +109,7 @@ Item {
                       : qsTr("No emoji found. Try another name.")
                 color: Theme.muted
                 font.family: Theme.bodyFamily
-                font.pixelSize: 14
+                font.pixelSize: Theme.fontSize(14)
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap
             }
@@ -115,9 +124,10 @@ Item {
 
         x: (view.width - width) / 2
         y: (view.height - height) / 2
-        width: Math.min(view.width - 24, 360)
-        height: Math.min(view.height - 24, Math.ceil(choices.length / 4) * 80 + 96)
-        padding: 16
+        width: Math.min(view.width - 24, Theme.fontSize(360))
+        height: Math.min(view.height - 24,
+                         Math.ceil(choices.length / 4) * Theme.fontSize(80) + Theme.fontSize(96))
+        padding: Theme.fontSize(16)
         modal: true
         focus: true
         closePolicy: T.Popup.CloseOnEscape | T.Popup.CloseOnPressOutside
@@ -132,13 +142,13 @@ Item {
         }
 
         contentItem: ColumnLayout {
-            spacing: 10
+            spacing: Theme.fontSize(10)
             Text {
                 Layout.fillWidth: true
                 text: qsTr("Choose a skin tone")
                 color: Theme.ink
                 font.family: Theme.bodyFamily
-                font.pixelSize: 18
+                font.pixelSize: Theme.fontSize(18)
                 font.weight: Font.Bold
             }
             Text {
@@ -146,7 +156,7 @@ Item {
                 text: variantPopup.baseName
                 color: Theme.muted
                 font.family: Theme.bodyFamily
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontSize(12)
                 elide: Text.ElideRight
             }
             GridView {
@@ -154,15 +164,15 @@ Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 model: variantPopup.choices
-                cellWidth: 80
-                cellHeight: 80
+                cellWidth: Theme.fontSize(80)
+                cellHeight: Theme.fontSize(80)
                 clip: true
                 reuseItems: true
                 boundsBehavior: Flickable.StopAtBounds
                 delegate: EmojiTile {
                     required property var modelData
-                    width: variantGrid.cellWidth - 8
-                    height: variantGrid.cellHeight - 8
+                    width: variantGrid.cellWidth - Theme.fontSize(8)
+                    height: variantGrid.cellHeight - Theme.fontSize(8)
                     focus: GridView.isCurrentItem
                     symbol: modelData.symbol
                     emojiName: modelData.emojiName

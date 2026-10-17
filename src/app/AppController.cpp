@@ -235,6 +235,11 @@ QString AppController::status() const
     return m_status;
 }
 
+QString AppController::attention() const
+{
+    return m_attention;
+}
+
 QString AppController::integrationWarning() const
 {
     return m_integrationWarning;
@@ -264,6 +269,7 @@ void AppController::copyEmoji(const QString &symbol)
 {
     if (symbol.isEmpty())
         return;
+    setAttention(QString());
     snapshotClipboardBeforeEmoji(symbol);
     m_ownContentHash = contentHash(QStringLiteral("text"), symbol.toUtf8());
     m_clipboard->setText(symbol);
@@ -283,12 +289,14 @@ void AppController::copyEntry(qint64 id)
     const QByteArray data = m_store->payload(id, &kind);
     if (data.isEmpty()) {
         setStatus(tr("This clipboard item is no longer available"));
+        setAttention(m_status);
         return;
     }
     if (kind == QStringLiteral("image")) {
         const QImage image = QImage::fromData(data, "PNG");
         if (image.isNull()) {
             setStatus(tr("This image could not be opened"));
+            setAttention(m_status);
             return;
         }
         m_ownContentHash = contentHash(kind, data);
@@ -299,6 +307,7 @@ void AppController::copyEntry(qint64 id)
     }
     m_store->touch(id);
     m_clipboardModel.reload();
+    setAttention(QString());
     setStatus(tr("Item copied. Paste it in your app."));
     emit itemCopied();
 }
@@ -347,6 +356,7 @@ void AppController::reportPasteResult(const QString &result, const QString &shor
 {
     if (result == QStringLiteral("sent")) {
         setStatus(tr("Paste sent with %1").arg(shortcut));
+        setAttention(QString());
     } else if (result == QStringLiteral("target-missing")) {
         setStatus(tr("Target window is gone. Item copied; paste manually."));
     } else if (result == QStringLiteral("focus-failed")) {
@@ -354,6 +364,8 @@ void AppController::reportPasteResult(const QString &result, const QString &shor
     } else {
         setStatus(tr("Automatic paste unavailable. Item copied; paste manually."));
     }
+    if (result != QStringLiteral("sent"))
+        setAttention(m_status);
 }
 
 void AppController::reportShortcutFailure(const QString &shortcut)
@@ -515,9 +527,10 @@ void AppController::captureCurrentClipboard()
 
     const NormalizedImage normalized = normalizeImage(mime);
     if (normalized.issue != ImageIssue::NoImage) {
-        if (normalized.issue == ImageIssue::TooLarge)
+        if (normalized.issue == ImageIssue::TooLarge) {
             setStatus(tr("Image is too large for history"));
-        else if (normalized.issue == ImageIssue::Unsupported)
+            setAttention(m_status);
+        } else if (normalized.issue == ImageIssue::Unsupported)
             setStatus(tr("Unsupported image format was skipped"));
         else if (normalized.issue == ImageIssue::Empty)
             setStatus(tr("Empty image was skipped"));
@@ -532,9 +545,10 @@ void AppController::captureCurrentClipboard()
         thumbnailBuffer.open(QIODevice::WriteOnly);
         normalized.image.scaled(QSize(320, 180), Qt::KeepAspectRatio, Qt::SmoothTransformation)
             .save(&thumbnailBuffer, "PNG");
-        if (m_store->addImage(normalized.png, thumbnail))
+        if (m_store->addImage(normalized.png, thumbnail)) {
             m_clipboardModel.reload();
-        else
+            setAttention(QString());
+        } else
             setStatus(m_store->errorString());
         return;
     }
@@ -553,11 +567,13 @@ void AppController::captureCurrentClipboard()
         return;
     if (utf8.size() > kMaxTextBytes) {
         setStatus(tr("Text is too large for history"));
+        setAttention(m_status);
         return;
     }
-    if (m_store->addText(text))
+    if (m_store->addText(text)) {
         m_clipboardModel.reload();
-    else
+        setAttention(QString());
+    } else
         setStatus(m_store->errorString());
 }
 
@@ -567,6 +583,14 @@ void AppController::setStatus(const QString &message)
         return;
     m_status = message;
     emit statusChanged();
+}
+
+void AppController::setAttention(const QString &message)
+{
+    if (m_attention == message)
+        return;
+    m_attention = message;
+    emit attentionChanged();
 }
 
 bool AppController::isOwnClipboardContent(const QString &kind, const QByteArray &content)

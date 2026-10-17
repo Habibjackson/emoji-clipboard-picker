@@ -19,6 +19,7 @@ private slots:
     void capturesCommonMimeFormatsAndPrefersImage();
     void skipsUnsafeOrUnsupportedClipboardItems();
     void pauseResumeCapturesCurrentClipboard();
+    void keepsPasteFailuresVisibleUntilTheNextAction();
     void restoredClipboardIsNotRecaptured();
     void laterCopyOfTemporaryEmojiIsCaptured();
     void newerIdenticalEmojiCopyIsCaptured();
@@ -145,6 +146,7 @@ void AppControllerTest::skipsUnsafeOrUnsupportedClipboardItems()
     controller.captureNow();
     QVERIFY(store.entries().isEmpty());
     QCOMPARE(controller.status(), QStringLiteral("Text is too large for history"));
+    QCOMPARE(controller.attention(), controller.status());
 
     QImage tooWide(8193, 1, QImage::Format_RGB32);
     tooWide.fill(Qt::red);
@@ -152,6 +154,7 @@ void AppControllerTest::skipsUnsafeOrUnsupportedClipboardItems()
     controller.captureNow();
     QVERIFY(store.entries().isEmpty());
     QCOMPARE(controller.status(), QStringLiteral("Image is too large for history"));
+    QCOMPARE(controller.attention(), controller.status());
 
     auto *oversized = new QMimeData;
     oversized->setData(QStringLiteral("image/png"), QByteArray(10 * 1024 * 1024 + 1, 'x'));
@@ -167,6 +170,7 @@ void AppControllerTest::skipsUnsafeOrUnsupportedClipboardItems()
     controller.captureNow();
     QVERIFY(store.entries().isEmpty());
     QCOMPARE(controller.status(), QStringLiteral("Unsupported image format was skipped"));
+    QCOMPARE(controller.attention(), QStringLiteral("Image is too large for history"));
 
     auto *corrupt = new QMimeData;
     corrupt->setData(QStringLiteral("image/jpeg"), QByteArray("not an image"));
@@ -187,6 +191,10 @@ void AppControllerTest::skipsUnsafeOrUnsupportedClipboardItems()
     controller.captureNow();
     QVERIFY(store.entries().isEmpty());
     QCOMPARE(controller.status(), QStringLiteral("Empty clipboard item was skipped"));
+
+    clipboard->setText(QStringLiteral("valid text clears the oversized warning"));
+    controller.captureNow();
+    QCOMPARE(controller.attention(), QString());
 }
 
 void AppControllerTest::pauseResumeCapturesCurrentClipboard()
@@ -204,6 +212,29 @@ void AppControllerTest::pauseResumeCapturesCurrentClipboard()
     controller.setPaused(false);
     QTRY_COMPARE(store.entries().size(), 1);
     QCOMPARE(store.entries().first().text, QStringLiteral("copied while paused"));
+}
+
+void AppControllerTest::keepsPasteFailuresVisibleUntilTheNextAction()
+{
+    QTemporaryDir directory;
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QVERIFY(store.open());
+    QGuiApplication::clipboard()->clear();
+    AppController controller(&store, QStringLiteral("emoji"));
+
+    controller.reportPasteResult(QStringLiteral("target-missing"), QString());
+    QCOMPARE(controller.attention(),
+             QStringLiteral("Target window is gone. Item copied; paste manually."));
+    controller.setPaused(true);
+    QCOMPARE(controller.attention(),
+             QStringLiteral("Target window is gone. Item copied; paste manually."));
+
+    controller.reportPasteResult(QStringLiteral("sent"), QStringLiteral("Ctrl+V"));
+    QCOMPARE(controller.attention(), QString());
+    controller.reportPasteResult(QStringLiteral("focus-failed"), QString());
+    QVERIFY(!controller.attention().isEmpty());
+    controller.copyEmoji(QString::fromUtf8("😀"));
+    QCOMPARE(controller.attention(), QString());
 }
 
 void AppControllerTest::restoredClipboardIsNotRecaptured()

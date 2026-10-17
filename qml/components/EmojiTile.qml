@@ -19,8 +19,8 @@ T.Button {
             picked(symbol)
     }
 
-    implicitWidth: 72
-    implicitHeight: 72
+    implicitWidth: Theme.fontSize(72)
+    implicitHeight: Theme.fontSize(72)
     hoverEnabled: true
     Accessible.name: variantCount > 0
                      ? qsTr("%1, choose from %2 skin tone options").arg(emojiName).arg(variantCount + 1)
@@ -35,12 +35,12 @@ T.Button {
         spacing: 0
         Item {
             width: parent.width
-            height: 48
+            height: Theme.fontSize(48)
             Text {
                 anchors.fill: parent
                 visible: control.renderable
                 text: control.symbol
-                font.pixelSize: 29
+                font.pixelSize: Theme.fontSize(29)
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 renderType: Text.NativeRendering
@@ -52,7 +52,7 @@ T.Button {
                 text: qsTr("No glyph")
                 color: Theme.accent
                 font.family: Theme.bodyFamily
-                font.pixelSize: 11
+                font.pixelSize: Theme.fontSize(11)
                 font.weight: Font.DemiBold
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
@@ -61,12 +61,12 @@ T.Button {
         }
         Text {
             width: parent.width
-            height: 18
+            height: Theme.fontSize(18)
             text: control.emojiName
             textFormat: Text.PlainText
             color: Theme.muted
             font.family: Theme.bodyFamily
-            font.pixelSize: 9
+            font.pixelSize: Theme.fontSize(9)
             horizontalAlignment: Text.AlignHCenter
             elide: Text.ElideRight
             Accessible.ignored: true
@@ -83,11 +83,11 @@ T.Button {
         Text {
             anchors.right: parent.right
             anchors.top: parent.top
-            anchors.margins: 3
+            anchors.margins: Theme.fontSize(3)
             visible: control.variantCount > 0
             text: "▾"
             color: Theme.accent
-            font.pixelSize: 12
+            font.pixelSize: Theme.fontSize(12)
             Accessible.ignored: true
         }
     }

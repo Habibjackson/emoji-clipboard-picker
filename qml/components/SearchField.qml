@@ -4,15 +4,15 @@ import QtQuick.Templates as T
 T.TextField {
     id: control
 
-    implicitHeight: 46
-    leftPadding: 16
-    rightPadding: 16
+    implicitHeight: Math.max(46, Theme.fontSize(42))
+    leftPadding: Theme.fontSize(16)
+    rightPadding: Theme.fontSize(16)
     color: Theme.ink
     selectionColor: Theme.accentSoft
     selectedTextColor: Theme.ink
     placeholderTextColor: Theme.muted
     font.family: Theme.bodyFamily
-    font.pixelSize: 14
+    font.pixelSize: Theme.fontSize(14)
     Accessible.name: placeholderText
 
     background: Rectangle {
@@ -29,7 +29,7 @@ T.TextField {
         text: control.placeholderText
         color: Theme.muted
         font.family: Theme.bodyFamily
-        font.pixelSize: 14
+        font.pixelSize: Theme.fontSize(14)
         visible: control.text.length === 0
         Accessible.ignored: true
     }

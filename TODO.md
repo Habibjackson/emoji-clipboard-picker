@@ -55,10 +55,10 @@
 - [x] Use a compact desktop window with two views: **Emoji** and **Clipboard**. Open the requested view directly from its shortcut; repeated activation toggles or switches the view predictably. (GNOME Shell passes picker focus to the Qt service; X11 checks its focused window. Switching views preserves the original paste target.)
 - [x] Emoji view: search field, persistent Recents, category navigation, lazy emoji grid, accessible names, and skin-tone variant chooser. (The live X11 keyboard check selected an emoji and an exact skin-tone variant; search text survived a view switch.)
 - [x] Clipboard view: Pinned section, newest-first Recent section, text previews, image thumbnails, search/filter, Pin/Unpin, Delete, Clear recent, and pause control.
-- [ ] Use Qt Quick Templates for customized controls, system-aware light/dark colors, scalable typography, and a visible keyboard focus ring. (Controls, theme, and focus rings are implemented; large-font verification remains.)
-- [ ] Support Tab, arrow keys, Enter, and Escape throughout. Ensure every pointer action also works from the keyboard and has an accessible label.
-- [ ] Show useful states for empty recents, no search results, all five pins used, capture paused, missing desktop integration, skipped oversized content, and failed paste.
-- [ ] Keep the picker usable at normal and large desktop font sizes and on smaller displays. Let the compositor place the window on Wayland rather than relying on absolute positioning.
+- [x] Use Qt Quick Templates for customized controls, system-aware light/dark colors, scalable typography, and a visible keyboard focus ring. (Type and control sizes follow the application font; a 1.5× type preview was checked.)
+- [x] Support Tab, arrow keys, Enter, and Escape throughout. Ensure every pointer action also works from the keyboard and has an accessible label. (Live X11 keyboard checks copied an emoji and a history card, selected an exact tone with arrows, and closed the tone popup with Escape.)
+- [x] Show useful states for empty recents, no search results, all five pins used, capture paused, missing desktop integration, skipped oversized content, and failed paste. (Oversize and paste failures remain in an attention banner when the picker is reopened.)
+- [x] Keep the picker usable at normal and large desktop font sizes and on smaller displays. Let the compositor place the window on Wayland rather than relying on absolute positioning. (Checked 640×480 and a simulated 1.5× type scale; compact layouts and the action rail scroll, and the window sets no x/y position.)
 
 ## 6. Finish Wayland and X11 paste flows
 

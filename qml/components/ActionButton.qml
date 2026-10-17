@@ -8,12 +8,12 @@ T.Button {
     property bool prominent: false
     property string accessibilityLabel: text
 
-    implicitHeight: 44
-    implicitWidth: Math.max(72, label.implicitWidth + 28)
-    padding: 10
+    implicitHeight: Math.max(44, Theme.fontSize(40))
+    implicitWidth: Math.max(Theme.fontSize(72), label.implicitWidth + Theme.fontSize(28))
+    padding: Theme.fontSize(10)
     hoverEnabled: true
     font.family: Theme.bodyFamily
-    font.pixelSize: 13
+    font.pixelSize: Theme.fontSize(13)
     Accessible.name: accessibilityLabel
     Keys.onReturnPressed: control.clicked()
     Keys.onEnterPressed: control.clicked()
@@ -25,7 +25,7 @@ T.Button {
                                : control.prominent ? Theme.accentInk
                                  : control.selected ? Theme.accent : Theme.ink
         font.family: Theme.bodyFamily
-        font.pixelSize: 13
+        font.pixelSize: Theme.fontSize(13)
         font.weight: control.selected || control.prominent ? Font.DemiBold : Font.Medium
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
