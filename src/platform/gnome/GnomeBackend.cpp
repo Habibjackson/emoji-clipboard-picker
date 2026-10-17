@@ -144,6 +144,7 @@ void GnomeBackend::restoreClipboard(quint64 snapshotGeneration, uint clipboardRe
             AppController::ClipboardRestoreResult::Unavailable);
         return;
     }
+    m_controller->expectClipboardRestore(mimeType, content);
 
     auto message = QDBusMessage::createMethodCall(
         QStringLiteral("org.emojikeyboard.ClipboardProbe"),

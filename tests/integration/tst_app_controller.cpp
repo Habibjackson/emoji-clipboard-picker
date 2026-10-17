@@ -18,6 +18,10 @@ private slots:
     void capturesAndCopies();
     void capturesCommonMimeFormatsAndPrefersImage();
     void skipsUnsafeOrUnsupportedClipboardItems();
+    void pauseResumeCapturesCurrentClipboard();
+    void restoredClipboardIsNotRecaptured();
+    void laterCopyOfTemporaryEmojiIsCaptured();
+    void newerIdenticalEmojiCopyIsCaptured();
     void snapshotsSupportedClipboardBeforeEmoji();
 };
 
@@ -46,6 +50,9 @@ void AppControllerTest::capturesAndCopies()
     controller.clipboardModel()->setQuery(QStringLiteral("missing"));
     QCOMPARE(controller.clipboardModel()->resultCount(), 0);
     controller.clipboardModel()->setQuery(QString());
+    controller.copyEntry(store.entries().first().id);
+    controller.captureNow();
+    QCOMPARE(store.entries().size(), 1);
 
     controller.copyEmoji(QString::fromUtf8("😀"));
     QCOMPARE(store.recentEmoji().first(), QString::fromUtf8("😀"));
@@ -132,6 +139,7 @@ void AppControllerTest::skipsUnsafeOrUnsupportedClipboardItems()
     auto *clipboard = QGuiApplication::clipboard();
     clipboard->clear();
     AppController controller(&store, QStringLiteral("clipboard"));
+    QTest::failOnWarning();
 
     clipboard->setText(QString(1024 * 1024 + 1, QLatin1Char('a')));
     controller.captureNow();
@@ -167,10 +175,146 @@ void AppControllerTest::skipsUnsafeOrUnsupportedClipboardItems()
     QVERIFY(store.entries().isEmpty());
     QCOMPARE(controller.status(), QStringLiteral("Image could not be decoded for history"));
 
+    auto *truncatedJpeg = new QMimeData;
+    truncatedJpeg->setData(QStringLiteral("image/jpeg"),
+                           QByteArray::fromHex("ffd8ff") + QByteArray("private"));
+    clipboard->setMimeData(truncatedJpeg);
+    controller.captureNow();
+    QVERIFY(store.entries().isEmpty());
+    QCOMPARE(controller.status(), QStringLiteral("Image could not be decoded for history"));
+
     clipboard->setText(QString());
     controller.captureNow();
     QVERIFY(store.entries().isEmpty());
     QCOMPARE(controller.status(), QStringLiteral("Empty clipboard item was skipped"));
+}
+
+void AppControllerTest::pauseResumeCapturesCurrentClipboard()
+{
+    QTemporaryDir directory;
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QVERIFY(store.open());
+    auto *clipboard = QGuiApplication::clipboard();
+    clipboard->clear();
+    AppController controller(&store, QStringLiteral("clipboard"));
+    controller.setPaused(true);
+    clipboard->setText(QStringLiteral("copied while paused"));
+    controller.captureNow();
+    QVERIFY(store.entries().isEmpty());
+    controller.setPaused(false);
+    QTRY_COMPARE(store.entries().size(), 1);
+    QCOMPARE(store.entries().first().text, QStringLiteral("copied while paused"));
+}
+
+void AppControllerTest::restoredClipboardIsNotRecaptured()
+{
+    QTemporaryDir directory;
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QVERIFY(store.open());
+    auto *clipboard = QGuiApplication::clipboard();
+    clipboard->clear();
+    AppController controller(&store, QStringLiteral("emoji"));
+
+    clipboard->setText(QStringLiteral("previous text"));
+    QTRY_COMPARE(store.entries().size(), 1);
+    const qint64 originalUse = store.entries().first().usedAt;
+    controller.copyEmoji(QString::fromUtf8("😀"));
+    QString temporaryText;
+    QString mimeType;
+    QByteArray content;
+    QVERIFY(controller.emojiClipboardSnapshot(&temporaryText, &mimeType, &content));
+    controller.expectClipboardRestore(mimeType, content);
+    clipboard->setText(QStringLiteral("previous text"));
+    controller.captureNow();
+    QCOMPARE(store.entries().size(), 1);
+    QCOMPARE(store.entries().first().usedAt, originalUse);
+    controller.reportClipboardRestoreResult(AppController::ClipboardRestoreResult::Restored);
+    controller.discardEmojiClipboardSnapshot();
+
+    controller.copyEmoji(QString::fromUtf8("🧪"));
+    QVERIFY(controller.emojiClipboardSnapshot(&temporaryText, &mimeType, &content));
+    controller.expectClipboardRestore(mimeType, content);
+    clipboard->setText(QStringLiteral("previous text"));
+    controller.captureNow();
+    QCOMPARE(store.entries().first().usedAt, originalUse);
+    controller.reportClipboardRestoreResult(AppController::ClipboardRestoreResult::Changed);
+    controller.discardEmojiClipboardSnapshot();
+    QVERIFY(store.entries().first().usedAt > originalUse);
+
+    clipboard->setText(QStringLiteral("new user copy"));
+    QTRY_COMPARE(store.entries().size(), 2);
+    QCOMPARE(store.entries().first().text, QStringLiteral("new user copy"));
+
+    QImage image(24, 24, QImage::Format_ARGB32);
+    image.fill(Qt::cyan);
+    clipboard->setImage(image);
+    QTRY_COMPARE(store.entries().size(), 3);
+    const qint64 imageId = store.entries().first().id;
+    const qint64 imageUse = store.entries().first().usedAt;
+    controller.copyEmoji(QString::fromUtf8("🎉"));
+    QVERIFY(controller.emojiClipboardSnapshot(&temporaryText, &mimeType, &content));
+    QCOMPARE(mimeType, QStringLiteral("image/png"));
+    controller.expectClipboardRestore(mimeType, content);
+    clipboard->setImage(image);
+    controller.captureNow();
+    QCOMPARE(store.entries().size(), 3);
+    QCOMPARE(store.entries().first().id, imageId);
+    QCOMPARE(store.entries().first().usedAt, imageUse);
+    controller.reportClipboardRestoreResult(AppController::ClipboardRestoreResult::Restored);
+    controller.discardEmojiClipboardSnapshot();
+}
+
+void AppControllerTest::laterCopyOfTemporaryEmojiIsCaptured()
+{
+    QTemporaryDir directory;
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QVERIFY(store.open());
+    auto *clipboard = QGuiApplication::clipboard();
+    clipboard->clear();
+    AppController controller(&store, QStringLiteral("emoji"));
+    clipboard->setText(QStringLiteral("prior"));
+    QTRY_COMPARE(store.entries().size(), 1);
+    controller.copyEmoji(QString::fromUtf8("😀"));
+
+    QString temporaryText;
+    QString mimeType;
+    QByteArray content;
+    QVERIFY(controller.emojiClipboardSnapshot(&temporaryText, &mimeType, &content));
+    controller.expectClipboardRestore(mimeType, content);
+    clipboard->setText(QStringLiteral("prior"));
+    controller.captureNow();
+    controller.reportClipboardRestoreResult(AppController::ClipboardRestoreResult::Restored);
+    controller.discardEmojiClipboardSnapshot();
+
+    clipboard->setText(QString::fromUtf8("😀"));
+    QTRY_COMPARE(store.entries().size(), 2);
+    QCOMPARE(store.entries().first().text, QString::fromUtf8("😀"));
+}
+
+void AppControllerTest::newerIdenticalEmojiCopyIsCaptured()
+{
+    QTemporaryDir directory;
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QVERIFY(store.open());
+    auto *clipboard = QGuiApplication::clipboard();
+    clipboard->clear();
+    AppController controller(&store, QStringLiteral("emoji"));
+    clipboard->setText(QStringLiteral("prior"));
+    QTRY_COMPARE(store.entries().size(), 1);
+    controller.copyEmoji(QString::fromUtf8("😀"));
+
+    QString temporaryText;
+    QString mimeType;
+    QByteArray content;
+    QVERIFY(controller.emojiClipboardSnapshot(&temporaryText, &mimeType, &content));
+    controller.expectClipboardRestore(mimeType, content);
+    clipboard->setText(QString::fromUtf8("😀"));
+    controller.captureNow();
+    QCOMPARE(store.entries().size(), 1);
+    controller.reportClipboardRestoreResult(AppController::ClipboardRestoreResult::Changed);
+    controller.discardEmojiClipboardSnapshot();
+    QTRY_COMPARE(store.entries().size(), 2);
+    QCOMPARE(store.entries().first().text, QString::fromUtf8("😀"));
 }
 
 void AppControllerTest::snapshotsSupportedClipboardBeforeEmoji()

@@ -5,16 +5,44 @@
 #include <QBuffer>
 #include <QClipboard>
 #include <QCryptographicHash>
+#include <QDateTime>
 #include <QGuiApplication>
 #include <QImage>
 #include <QImageReader>
+#include <QLoggingCategory>
 #include <QMimeData>
 #include <QSet>
 #include <QTimer>
 
+#include <atomic>
 #include <utility>
 
 namespace {
+std::atomic<QLoggingCategory::CategoryFilter> previousCategoryFilter = nullptr;
+
+void filterImageDecoderLogs(QLoggingCategory *category)
+{
+    if (auto previous = previousCategoryFilter.load(std::memory_order_acquire))
+        previous(category);
+    if (!QByteArrayView(category->categoryName()).startsWith("qt.gui.imageio."))
+        return;
+    // Decoders may include clipboard bytes in their diagnostic messages.
+    category->setEnabled(QtDebugMsg, false);
+    category->setEnabled(QtInfoMsg, false);
+    category->setEnabled(QtWarningMsg, false);
+    category->setEnabled(QtCriticalMsg, false);
+}
+
+void protectClipboardDecoderLogs()
+{
+    static const bool installed = [] {
+        previousCategoryFilter.store(QLoggingCategory::installFilter(filterImageDecoderLogs),
+                                     std::memory_order_release);
+        return true;
+    }();
+    Q_UNUSED(installed)
+}
+
 constexpr qsizetype kMaxTextBytes = 1024 * 1024;
 constexpr qsizetype kMaxImageBytes = 10 * 1024 * 1024;
 constexpr qint64 kMaxImagePixels = 32 * 1024 * 1024;
@@ -32,6 +60,28 @@ bool imageTooLarge(const QSize &size)
 {
     return !size.isValid() || size.width() > 8192 || size.height() > 8192
         || qint64(size.width()) * size.height() > kMaxImagePixels;
+}
+
+bool hasBitmapSignature(const QString &format, const QByteArray &data)
+{
+    if (format == QLatin1String("image/png"))
+        return data.startsWith(QByteArray::fromHex("89504e470d0a1a0a"));
+    if (format == QLatin1String("image/jpeg"))
+        return data.size() >= 3 && uchar(data[0]) == 0xff
+            && uchar(data[1]) == 0xd8 && uchar(data[2]) == 0xff;
+    if (format == QLatin1String("image/bmp")
+        || format == QLatin1String("image/x-ms-bmp")) {
+        return data.startsWith("BM");
+    }
+    if (format == QLatin1String("image/gif"))
+        return data.startsWith("GIF87a") || data.startsWith("GIF89a");
+    if (format == QLatin1String("image/webp"))
+        return data.size() >= 12 && data.startsWith("RIFF")
+            && data.mid(8, 4) == QByteArray("WEBP");
+    if (format == QLatin1String("image/tiff"))
+        return data.startsWith(QByteArray::fromHex("49492a00"))
+            || data.startsWith(QByteArray::fromHex("4d4d002a"));
+    return false;
 }
 
 NormalizedImage normalizeImage(const QMimeData *mime)
@@ -60,6 +110,10 @@ NormalizedImage normalizeImage(const QMimeData *mime)
         }
         if (encoded.size() > kMaxImageBytes) {
             result.issue = ImageIssue::TooLarge;
+            continue;
+        }
+        if (!hasBitmapSignature(format.toLower(), encoded)) {
+            result.issue = ImageIssue::Invalid;
             continue;
         }
         QBuffer buffer(&encoded);
@@ -135,6 +189,7 @@ AppController::AppController(HistoryStore *store, QString initialView, QObject *
     , m_clipboardModel(store, this)
     , m_initialView(std::move(initialView))
 {
+    protectClipboardDecoderLogs();
     if (!m_emojiModel.load(QStringLiteral(":/data/emoji-test.txt")))
         setStatus(tr("Emoji catalog could not be loaded"));
     m_emojiModel.setRecent(m_store->recentEmoji());
@@ -339,12 +394,24 @@ void AppController::refreshIntegrationWarning()
 
 void AppController::reportClipboardRestoreResult(ClipboardRestoreResult result)
 {
-    if (result == ClipboardRestoreResult::Restored)
+    if (result == ClipboardRestoreResult::Restored) {
+        m_ownContentHash.clear();
+        if (!m_restoreObserved)
+            m_restoreSuppressionExpiresAt = QDateTime::currentMSecsSinceEpoch() + 3000;
         setStatus(tr("Paste sent. Previous clipboard restored."));
-    else if (result == ClipboardRestoreResult::Changed)
+    } else if (result == ClipboardRestoreResult::Changed) {
+        m_expectedRestoreHash.clear();
+        m_restoreSuppressionExpiresAt = 0;
+        m_restoreObserved = false;
+        m_ownContentHash.clear();
+        captureCurrentClipboard();
         setStatus(tr("Paste sent. A newer clipboard copy was kept."));
-    else
+    } else {
+        m_expectedRestoreHash.clear();
+        m_restoreSuppressionExpiresAt = 0;
+        m_restoreObserved = false;
         setStatus(tr("Paste sent. Previous clipboard could not be safely restored."));
+    }
 }
 
 bool AppController::hasEmojiClipboardSnapshot() const
@@ -375,6 +442,22 @@ bool AppController::emojiClipboardSnapshot(QString *temporaryText, QString *mime
     return m_snapshotImage.save(&buffer, "PNG") && content->size() <= 10 * 1024 * 1024;
 }
 
+void AppController::expectClipboardRestore(const QString &mimeType, const QByteArray &content)
+{
+    m_expectedRestoreHash.clear();
+    m_restoreSuppressionExpiresAt = 0;
+    m_restoreObserved = false;
+    if (content.isEmpty())
+        return;
+    const QString kind = mimeType == QStringLiteral("image/png") ? QStringLiteral("image")
+        : mimeType == QStringLiteral("text/plain;charset=utf-8") ? QStringLiteral("text")
+                                                              : QString();
+    if (kind.isEmpty())
+        return;
+    m_expectedRestoreHash = contentHash(kind, content);
+    m_restoreSuppressionExpiresAt = QDateTime::currentMSecsSinceEpoch() + 5000;
+}
+
 void AppController::discardEmojiClipboardSnapshot()
 {
     ++m_snapshotGeneration;
@@ -387,6 +470,9 @@ void AppController::discardEmojiClipboardSnapshot()
 void AppController::snapshotClipboardBeforeEmoji(const QString &symbol)
 {
     discardEmojiClipboardSnapshot();
+    m_expectedRestoreHash.clear();
+    m_restoreSuppressionExpiresAt = 0;
+    m_restoreObserved = false;
     const QMimeData *mime = m_clipboard->mimeData();
     if (!mime || mime->hasUrls() || privateClipboard(mime)) {
         return;
@@ -485,9 +571,22 @@ void AppController::setStatus(const QString &message)
 
 bool AppController::isOwnClipboardContent(const QString &kind, const QByteArray &content)
 {
+    const QByteArray hash = contentHash(kind, content);
+    if (!m_expectedRestoreHash.isEmpty()) {
+        if (QDateTime::currentMSecsSinceEpoch() > m_restoreSuppressionExpiresAt) {
+            m_expectedRestoreHash.clear();
+            m_restoreSuppressionExpiresAt = 0;
+            m_restoreObserved = false;
+        } else if (m_expectedRestoreHash == hash) {
+            m_restoreObserved = true;
+            m_restoreSuppressionExpiresAt = QDateTime::currentMSecsSinceEpoch() + 500;
+            m_ownContentHash.clear();
+            return true;
+        }
+    }
     if (m_ownContentHash.isEmpty())
         return false;
-    if (m_ownContentHash == contentHash(kind, content))
+    if (m_ownContentHash == hash)
         return true;
     m_ownContentHash.clear();
     return false;

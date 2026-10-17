@@ -56,6 +56,7 @@ public:
     quint64 emojiClipboardSnapshotGeneration() const;
     bool emojiClipboardSnapshot(QString *temporaryText, QString *mimeType,
                                 QByteArray *content) const;
+    void expectClipboardRestore(const QString &mimeType, const QByteArray &content);
     void discardEmojiClipboardSnapshot();
 
 signals:
@@ -83,6 +84,9 @@ private:
     QString m_integrationWarning;
     bool m_copyOnly = false;
     QByteArray m_ownContentHash;
+    QByteArray m_expectedRestoreHash;
+    qint64 m_restoreSuppressionExpiresAt = 0;
+    bool m_restoreObserved = false;
     enum class SnapshotKind { None, Text, Image };
     SnapshotKind m_snapshotKind = SnapshotKind::None;
     QString m_snapshotText;

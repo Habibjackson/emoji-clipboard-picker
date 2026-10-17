@@ -47,7 +47,7 @@
 - [x] Deduplicate by content type and SHA-256 payload hash. Recopying an item updates its timestamp and position while preserving its pin state.
 - [x] Enforce 5 pinned and 20 unpinned entries in a transaction. Evict only the oldest unpinned entry; disable Pin with an explanation when 5 are already pinned.
 - [x] On unpin, move the item into the unpinned recents and apply the 20-item cap. Let Clear recent remove only unpinned items; provide separate confirmed Clear all and individual Delete actions. (Clear all preserves emoji recents.)
-- [ ] Implement pause/resume capture. Suppress the app's own temporary clipboard writes so emoji insertion and history paste do not create unintended duplicate captures. (Pause and copy suppression are implemented; paste flow remains.)
+- [x] Implement pause/resume capture. Suppress the app's own temporary clipboard writes so emoji insertion and history paste do not create unintended duplicate captures. (The GNOME restore path also suppresses its expected prior text/image; a newer copy is captured.)
 - [x] Generate bounded image thumbnails for QML without decoding full-resolution images in every delegate.
 
 ## 5. Build the QML picker
