@@ -60,6 +60,9 @@ def install_test_input(extension: Path) -> None:
         '      <arg name="x" type="i" direction="in"/>\n'
         '      <arg name="y" type="i" direction="in"/>\n'
         '    </method>\n'
+        '    <method name="PointerButton">\n'
+        '      <arg name="pressed" type="b" direction="in"/>\n'
+        '    </method>\n'
         '    <method name="PointerLocation">\n'
         '      <arg name="x" type="i" direction="out"/>\n'
         '      <arg name="y" type="i" direction="out"/>\n'
@@ -104,6 +107,11 @@ def install_test_input(extension: Path) -> None:
         const seat = Clutter.get_default_backend().get_default_seat();
         this._testPointer ??= seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
         this._testPointer.notify_absolute_motion(GLib.get_monotonic_time(), x, y);
+    }
+
+    PointerButton(pressed) {
+        this._testPointer.notify_button(GLib.get_monotonic_time(), Clutter.BUTTON_PRIMARY,
+            pressed ? Clutter.ButtonState.PRESSED : Clutter.ButtonState.RELEASED);
     }
 
     PointerLocation() {
@@ -259,16 +267,28 @@ def set_pointer(x: int, y: int) -> None:
     raise RuntimeError(f"Test pointer did not move to ({x}, {y}); actual={actual}")
 
 
+def pointer_button(pressed: bool) -> None:
+    result = bus_call("org.emojikeyboard.ClipboardProbe",
+                      "org.emojikeyboard.ClipboardProbe.PointerButton",
+                      "/org/emojikeyboard/ClipboardProbe", "true" if pressed else "false")
+    if result.returncode:
+        raise RuntimeError(f"Could not change test pointer button: {result.stderr.strip()}")
+
+
+def picker_frame() -> tuple[int, int, int, int]:
+    result = bus_call("org.emojikeyboard.ClipboardProbe",
+                      "org.emojikeyboard.ClipboardProbe.PickerFrame",
+                      "/org/emojikeyboard/ClipboardProbe")
+    if result.returncode:
+        raise RuntimeError(f"Could not read picker frame: {result.stderr.strip()}")
+    return ast.literal_eval(result.stdout.strip())
+
+
 def wait_for_picker_near(x: int, y: int, flip: bool) -> None:
     deadline = time.monotonic() + 5
     frame = None
     while time.monotonic() < deadline:
-        result = bus_call("org.emojikeyboard.ClipboardProbe",
-                          "org.emojikeyboard.ClipboardProbe.PickerFrame",
-                          "/org/emojikeyboard/ClipboardProbe")
-        if result.returncode:
-            raise RuntimeError(f"Could not read picker frame: {result.stderr.strip()}")
-        frame = ast.literal_eval(result.stdout.strip())
+        frame = picker_frame()
         left, top, width, height = frame
         expected_x = x - width - 12 if flip else x + 12
         expected_y = y - height - 12 if flip else y + 12
@@ -424,6 +444,26 @@ def check_child(test_root: Path) -> int:
                 raise RuntimeError(f"Picker did not become visible: {visible.stdout.strip()}")
             wait_for_picker_near(80, 80, flip=False)
             print("Extension to Qt D-Bus activation: passed")
+
+            focus_title("Emoji Keyboard")
+            time.sleep(0.5)
+            before = picker_frame()
+            grip_x, grip_y = before[0] + 28, before[1] + 32
+            set_pointer(grip_x, grip_y)
+            pointer_button(True)
+            try:
+                time.sleep(0.1)
+                set_pointer(grip_x + 24, grip_y + 12)
+                time.sleep(0.1)
+                set_pointer(grip_x + 115, grip_y + 65)
+                time.sleep(0.2)
+            finally:
+                pointer_button(False)
+            after = picker_frame()
+            if after[0] - before[0] < 60 or after[1] - before[1] < 30 \
+                    or after[2:] != before[2:]:
+                raise RuntimeError(f"Picker did not move with its grip: {before} -> {after}")
+            print("GNOME Wayland: visible picker moved by drag handle")
 
             hide = bus_call("org.emojikeyboard.App", "org.emojikeyboard.App.Hide",
                             "/org/emojikeyboard/App")
@@ -845,7 +885,8 @@ def main() -> int:
                 if line.startswith(("Headless GNOME check failed:",
                                     "Session restart check failed:", "GNOME extension:",
                                     "Extension clipboard counters:", "Qt picker:",
-                                    "Extension to Qt D-Bus activation:", "GNOME shortcuts:",
+                                    "Extension to Qt D-Bus activation:", "GNOME Wayland:",
+                                    "GNOME shortcuts:",
                                     "Qt Wayland:", "GTK Wayland:", "Terminal:",
                                     "Qt XWayland:", "Clipboard view:",
                                     "Session restart:")):

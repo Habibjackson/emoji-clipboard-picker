@@ -60,6 +60,7 @@
 - [x] Show useful states for empty recents, no search results, all five pins used, capture paused, missing desktop integration, skipped oversized content, and failed paste. (Oversize and paste failures remain in an attention banner when the picker is reopened.)
 - [x] Keep the picker usable at normal and large desktop font sizes and on smaller displays. (Checked 640×480 at 1.5× DPI; a short window combines view tabs and actions in one row, leaving two emoji rows visible.)
 - [x] Open beside the mouse pointer inside the current monitor's work area. (Qt positions the X11 window; the GNOME Shell extension moves the Wayland window after it appears. Isolated X11 and GNOME edge tests pass.)
+- [x] Keep the default picker at 340 × 390 logical pixels and allow dragging the visible window by its grip or title. (The compact header retains the status footer; an isolated GNOME Wayland pointer test checks that dragging moves the window.)
 
 ## 6. Finish Wayland and X11 paste flows
 

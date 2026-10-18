@@ -11,6 +11,8 @@ T.ApplicationWindow {
     property string currentView: controller.initialView
     readonly property int availableWidth: Screen.width > 0 ? Screen.width : 720
     readonly property int availableHeight: Screen.height > 0 ? Screen.height : 520
+    readonly property bool compactHeader: width <= Theme.layoutSize(350)
+                                          || height < Theme.layoutSize(410)
     readonly property bool shortHeight: height < Theme.layoutSize(380)
     readonly property string pasteModeLabel: controller.pasteShortcutMode === "ctrl-v"
                                               ? qsTr("Ctrl+V")
@@ -20,8 +22,8 @@ T.ApplicationWindow {
     visible: false
     flags: Qt.Tool | Qt.FramelessWindowHint
     color: "transparent"
-    width: Math.min(Theme.layoutSize(380), availableWidth - 24)
-    height: Math.min(Theme.layoutSize(430), availableHeight - 24)
+    width: Math.min(Theme.layoutSize(340), availableWidth - 24)
+    height: Math.min(Theme.layoutSize(390), availableHeight - 24)
     minimumWidth: Math.min(Theme.layoutSize(320), availableWidth - 24)
     minimumHeight: Math.min(Theme.layoutSize(360), availableHeight - 24)
     title: qsTr("Emoji Keyboard")
@@ -48,34 +50,54 @@ T.ApplicationWindow {
         spacing: Theme.layoutSize(6)
 
         RowLayout {
-            visible: !window.shortHeight
+            visible: !window.compactHeader
             Layout.fillWidth: true
             Layout.preferredHeight: Theme.layoutSize(44)
             spacing: Theme.layoutSize(7)
 
-            Rectangle {
-                Layout.preferredWidth: Theme.layoutSize(30)
-                Layout.preferredHeight: Theme.layoutSize(30)
-                radius: Theme.smallRadius
-                color: Theme.accent
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "✦"
-                    color: Theme.accentInk
-                    font.pixelSize: Theme.fontSize(19)
-                    Accessible.ignored: true
-                }
-            }
-
-            Text {
+            Item {
                 Layout.fillWidth: true
-                text: qsTr("Emoji Keyboard")
-                color: Theme.ink
-                font.family: Theme.bodyFamily
-                font.pixelSize: Theme.fontSize(15)
-                font.weight: Font.Bold
-                elide: Text.ElideRight
+                Layout.fillHeight: true
+                Accessible.name: qsTr("Drag to move picker")
+
+                RowLayout {
+                    anchors.fill: parent
+                    spacing: Theme.layoutSize(7)
+
+                    Rectangle {
+                        Layout.preferredWidth: Theme.layoutSize(30)
+                        Layout.preferredHeight: Theme.layoutSize(30)
+                        radius: Theme.smallRadius
+                        color: Theme.accent
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "✦"
+                            color: Theme.accentInk
+                            font.pixelSize: Theme.fontSize(19)
+                            Accessible.ignored: true
+                        }
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: qsTr("Emoji Keyboard")
+                        color: Theme.ink
+                        font.family: Theme.bodyFamily
+                        font.pixelSize: Theme.fontSize(15)
+                        font.weight: Font.Bold
+                        elide: Text.ElideRight
+                    }
+                }
+
+                DragHandler {
+                    target: null
+                    cursorShape: Qt.SizeAllCursor
+                    onActiveChanged: {
+                        if (active)
+                            window.startSystemMove()
+                    }
+                }
             }
 
             ActionButton {
@@ -106,9 +128,35 @@ T.ApplicationWindow {
                 anchors.margins: Theme.layoutSize(2)
                 spacing: Theme.layoutSize(3)
 
+                Item {
+                    visible: window.compactHeader
+                    Layout.preferredWidth: Theme.layoutSize(32)
+                    Layout.fillHeight: true
+                    Accessible.name: qsTr("Drag to move picker")
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "⋮⋮"
+                        color: Theme.muted
+                        font.family: Theme.bodyFamily
+                        font.pixelSize: Theme.fontSize(17)
+                        Accessible.ignored: true
+                    }
+
+                    DragHandler {
+                        target: null
+                        cursorShape: Qt.SizeAllCursor
+                        onActiveChanged: {
+                            if (active)
+                                window.startSystemMove()
+                        }
+                    }
+                }
+
                 ActionButton {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    Layout.minimumWidth: 0
                     text: qsTr("Emoji")
                     selected: window.currentView === "emoji"
                     onClicked: window.currentView = "emoji"
@@ -116,12 +164,13 @@ T.ApplicationWindow {
                 ActionButton {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    Layout.minimumWidth: 0
                     text: qsTr("Clipboard")
                     selected: window.currentView === "clipboard"
                     onClicked: window.currentView = "clipboard"
                 }
                 ActionButton {
-                    visible: window.shortHeight
+                    visible: window.compactHeader
                     Layout.preferredWidth: Theme.layoutSize(44)
                     Layout.fillHeight: true
                     text: "⋯"
@@ -131,7 +180,7 @@ T.ApplicationWindow {
                     onClicked: actionsPopup.open()
                 }
                 ActionButton {
-                    visible: window.shortHeight
+                    visible: window.compactHeader
                     Layout.preferredWidth: Theme.layoutSize(44)
                     Layout.fillHeight: true
                     text: "×"
@@ -239,7 +288,7 @@ T.ApplicationWindow {
         id: actionsPopup
         parent: window.contentItem
         x: window.width - width - Theme.fontSize(12)
-        y: window.shortHeight ? Theme.layoutSize(54) : Theme.fontSize(58)
+        y: window.compactHeader ? Theme.layoutSize(54) : Theme.fontSize(58)
         width: Math.min(Theme.fontSize(232), window.width - Theme.fontSize(24))
         height: actionsContent.implicitHeight + topPadding + bottomPadding
         padding: Theme.fontSize(8)
@@ -309,7 +358,7 @@ T.ApplicationWindow {
         id: pasteShortcutPopup
         parent: window.contentItem
         x: window.width - width - Theme.fontSize(12)
-        y: window.shortHeight ? Theme.layoutSize(54) : Theme.fontSize(58)
+        y: window.compactHeader ? Theme.layoutSize(54) : Theme.fontSize(58)
         width: Math.min(Theme.fontSize(208), window.width - Theme.fontSize(24))
         height: pasteChoices.implicitHeight + topPadding + bottomPadding
         padding: Theme.fontSize(8)
