@@ -81,6 +81,10 @@ def install_test_input(extension: Path) -> None:
         '    <method name="PickerAboveTarget">\n'
         '      <arg name="title" type="s" direction="in"/>\n'
         '      <arg name="above" type="b" direction="out"/>\n'
+        '    </method>\n'
+        '    <method name="SetWindowAbove">\n'
+        '      <arg name="title" type="s" direction="in"/>\n'
+        '      <arg name="above" type="b" direction="in"/>\n'
         '    </method>\n' + interface_anchor)
     contents = contents.replace(method_anchor,
         '''    InjectKey(key) {
@@ -145,6 +149,17 @@ def install_test_input(extension: Path) -> None:
             return false;
         const stacked = global.display.sort_windows_by_stacking([picker, target]);
         return stacked.indexOf(picker) > stacked.indexOf(target);
+    }
+
+    SetWindowAbove(title, above) {
+        const target = global.display.list_all_windows().find(window =>
+            window.get_title() === title);
+        if (!target)
+            throw new Error(`Window not found: ${title}`);
+        if (above)
+            target.make_above();
+        else
+            target.unmake_above();
     }
 
     InjectShortcut(view) {
@@ -316,6 +331,15 @@ def picker_above_target(title: str) -> bool:
     if result.returncode:
         raise RuntimeError(f"Could not read picker stacking: {result.stderr.strip()}")
     return "true" in result.stdout.lower()
+
+
+def set_window_above(title: str, above: bool) -> None:
+    result = bus_call("org.emojikeyboard.ClipboardProbe",
+                      "org.emojikeyboard.ClipboardProbe.SetWindowAbove",
+                      "/org/emojikeyboard/ClipboardProbe", title,
+                      "true" if above else "false")
+    if result.returncode:
+        raise RuntimeError(f"Could not change test window stacking: {result.stderr.strip()}")
 
 
 def wait_for_picker_near(x: int, y: int, flip: bool) -> None:
@@ -634,6 +658,7 @@ def check_child(test_root: Path) -> int:
             wait_for_file(Path(str(result_path) + ".clipboard"), "IMAGE 2x2")
             print("Qt Wayland: prior image restoration passed")
 
+            set_window_above(title, True)
             inject_shortcut("clipboard")
             wait_for_view("clipboard")
             print("Qt Wayland: Super+V opens clipboard history")
@@ -657,6 +682,7 @@ def check_child(test_root: Path) -> int:
             wait_for_view("clipboard")
             if not picker_above_target(title):
                 raise RuntimeError("Clipboard picker is hidden after the second paste")
+            set_window_above(title, False)
             print("Qt Wayland: history stays open and pastes a second selection")
 
             preview_path = test_root / "clipboard-preview.png"

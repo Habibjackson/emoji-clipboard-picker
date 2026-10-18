@@ -171,6 +171,18 @@ void GnomeBackend::pasteSelection(bool emoji, quint64 snapshotGeneration)
                 reportFailure(QStringLiteral("bridge-unavailable"));
             } else {
                 m_controller->reportPasteResult(reply.argumentAt<0>(), reply.argumentAt<1>());
+                if (reply.argumentAt<0>() == QStringLiteral("sent") && m_window
+                    && m_window->isVisible()
+                    && m_window->property("currentView").toString()
+                        == QStringLiteral("clipboard")) {
+                    auto raise = QDBusMessage::createMethodCall(
+                        QStringLiteral("org.emojikeyboard.ClipboardProbe"),
+                        QStringLiteral("/org/emojikeyboard/ClipboardProbe"),
+                        QStringLiteral("org.emojikeyboard.ClipboardProbe"),
+                        QStringLiteral("RaisePicker"));
+                    raise.setArguments({uint(QCoreApplication::applicationPid())});
+                    QDBusConnection::sessionBus().asyncCall(raise);
+                }
                 if (reply.argumentAt<0>() == QStringLiteral("sent") && emoji) {
                     if (reply.argumentAt<2>() != 0) {
                         const uint revision = reply.argumentAt<2>();

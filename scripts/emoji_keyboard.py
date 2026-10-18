@@ -433,7 +433,9 @@ def status(paths: dict[str, Path], recheck: bool) -> int:
                 bridge = run("gdbus", "introspect", "--session", "--dest",
                              "org.emojikeyboard.ClipboardProbe", "--object-path",
                              "/org/emojikeyboard/ClipboardProbe", check=False)
-                current_bridge = bridge.returncode == 0 and "PositionPicker(" in bridge.stdout
+                current_bridge = (bridge.returncode == 0
+                                  and "PositionPicker(" in bridge.stdout
+                                  and "RaisePicker(" in bridge.stdout)
             except FileNotFoundError:
                 pass
             if current_bridge is False:

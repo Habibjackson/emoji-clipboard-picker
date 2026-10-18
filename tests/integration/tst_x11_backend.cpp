@@ -82,6 +82,27 @@ bool hasKind(const HistoryStore &store, const QString &kind)
     }
     return false;
 }
+
+bool stackedAbove(Display *display, Window upper, Window lower)
+{
+    Window root = None;
+    Window parent = None;
+    Window *children = nullptr;
+    unsigned int count = 0;
+    if (!XQueryTree(display, DefaultRootWindow(display), &root, &parent, &children, &count))
+        return false;
+    int upperIndex = -1;
+    int lowerIndex = -1;
+    for (unsigned int index = 0; index < count; ++index) {
+        if (children[index] == upper)
+            upperIndex = int(index);
+        if (children[index] == lower)
+            lowerIndex = int(index);
+    }
+    if (children)
+        XFree(children);
+    return upperIndex >= 0 && lowerIndex >= 0 && upperIndex > lowerIndex;
+}
 }
 
 void X11BackendTest::opensNearPointerAndFlipsAtEdges()
@@ -133,6 +154,7 @@ void X11BackendTest::clipboardShortcutsAndPaste()
     AppController controller(&store, QStringLiteral("emoji"));
     QQuickWindow picker;
     picker.setProperty("currentView", QStringLiteral("emoji"));
+    picker.setFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
     picker.resize(400, 300);
     X11Backend backend(&picker, &controller);
     QVERIFY2(backend.isAvailable(), qPrintable(backend.errorString()));
@@ -212,6 +234,9 @@ void X11BackendTest::clipboardShortcutsAndPaste()
     controller.copyEntry(textId);
     QTRY_COMPARE_WITH_TIMEOUT(pasteSpy.size(), 2, 3000);
     QTRY_COMPARE_WITH_TIMEOUT(pastedText(resultPath), QStringLiteral("X11 source text"), 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(stackedAbove(display, Window(picker.winId()), targetWindow), 3000);
+    QTRY_VERIFY_WITH_TIMEOUT((XGetInputFocus(display, &focused, &revert),
+                              focused == targetWindow), 3000);
     for (const auto &entry : store.entries()) {
         if (entry.id == textId) {
             QVERIFY(entry.pinned);

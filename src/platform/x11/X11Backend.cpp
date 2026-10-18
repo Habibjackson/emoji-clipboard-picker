@@ -490,6 +490,15 @@ void X11Backend::sendPaste(unsigned long target, bool emoji, quint64 snapshotGen
     XFlush(m_display);
     m_controller->reportPasteResult(QStringLiteral("sent"), shortcut);
     emit pasteSent(shortcut);
+    if (m_window && m_window->isVisible()
+        && m_window->property("currentView").toString() == QStringLiteral("clipboard")) {
+        QTimer::singleShot(0, this, [this] {
+            if (m_window && m_window->isVisible()
+                && m_window->property("currentView").toString()
+                    == QStringLiteral("clipboard"))
+                m_window->raise();
+        });
+    }
     if (!emoji) {
         m_controller->discardEmojiClipboardSnapshot();
         return;

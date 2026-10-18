@@ -112,6 +112,7 @@ class SetupTests(unittest.TestCase):
     def test_recheck_accepts_custom_keys_and_reports_real_overlap(self):
         self.values["emoji"] = ["<Super>e"]
         self.values["clipboard"] = ["<Control><Alt>b"]
+        bridge_methods = "PositionPicker(\nRaisePicker("
         for name in ("bin", "desktop", "dbus", "unit"):
             self.paths[name].parent.mkdir(parents=True, exist_ok=True)
             self.paths[name].write_text("installed")
@@ -120,7 +121,7 @@ class SetupTests(unittest.TestCase):
             if args[:3] == ("gnome-extensions", "list", "--active"):
                 return subprocess_result(setup.UUID + "\n")
             if args[0] == "gdbus":
-                return subprocess_result("PositionPicker(")
+                return subprocess_result(bridge_methods)
             if args[:3] == ("systemctl", "--user", "is-active"):
                 return subprocess_result("active\n")
             if args[:3] == ("systemctl", "--user", "is-enabled"):
@@ -137,6 +138,12 @@ class SetupTests(unittest.TestCase):
             output.seek(0)
             self.assertEqual(setup.status(self.paths, recheck=True), 1)
             self.assertIn("ibus shortcut conflict", output.getvalue())
+            self.values["ibus"].pop()
+            bridge_methods = "PositionPicker("
+            output.truncate(0)
+            output.seek(0)
+            self.assertEqual(setup.status(self.paths, recheck=True), 1)
+            self.assertIn("previous version still loaded", output.getvalue())
 
     def test_non_gnome_x11_leaves_gnome_settings_alone(self):
         with mock.patch.dict(os.environ, {"XDG_CURRENT_DESKTOP": "XFCE", "XDG_SESSION_TYPE": "x11"}):

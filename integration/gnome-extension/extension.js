@@ -33,6 +33,9 @@ const INTERFACE_XML = `
     <method name="PositionPicker">
       <arg name="pid" type="u" direction="in"/>
     </method>
+    <method name="RaisePicker">
+      <arg name="pid" type="u" direction="in"/>
+    </method>
     <method name="CancelPaste"/>
     <method name="PasteSelection">
       <arg name="shortcutMode" type="s" direction="in"/>
@@ -195,6 +198,17 @@ export default class EmojiKeyboardExtension extends Extension {
             }
             return GLib.SOURCE_CONTINUE;
         });
+    }
+
+    RaisePicker(pid) {
+        const picker = global.display.list_all_windows().find(window =>
+            window.get_pid() === pid && window.get_title() === 'Emoji Keyboard'
+            && window.showing_on_its_workspace());
+        if (!picker)
+            return;
+        if (!picker.is_above())
+            picker.make_above();
+        picker.raise();
     }
 
     CancelPaste() {
