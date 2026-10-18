@@ -484,6 +484,7 @@ def check_child(test_root: Path) -> int:
             theme_x = after[0] + after[2] - 120
             theme_y = after[1] + 32
             click_pointer(theme_x, theme_y)
+            time.sleep(0.25)
             click_pointer(theme_x, after[1] + 178)
             deadline = time.monotonic() + 3
             while time.monotonic() < deadline:
@@ -496,6 +497,7 @@ def check_child(test_root: Path) -> int:
                                    f"click=({theme_x},{theme_y}), settings={saved!r}, "
                                    f"app={app_log.read_text(errors='replace')[-500:]!r}")
             click_pointer(theme_x, theme_y)
+            time.sleep(0.25)
             click_pointer(theme_x, after[1] + 84)
             deadline = time.monotonic() + 3
             while time.monotonic() < deadline:

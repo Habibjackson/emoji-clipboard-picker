@@ -79,7 +79,7 @@ RowLayout {
             radius: Theme.smallRadius
             color: recorder.recording ? Theme.accentSoft
                                       : keyButton.hovered ? Theme.surfaceHover : Theme.rail
-            border.color: recorder.recording || keyButton.activeFocus
+            border.color: recorder.recording || keyButton.visualFocus
                           ? Theme.accent : Theme.line
             border.width: 1
             Behavior on color { ColorAnimation { duration: 130 } }

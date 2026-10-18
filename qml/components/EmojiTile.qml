@@ -87,8 +87,8 @@ T.Button {
         radius: Theme.smallRadius
         color: control.down ? Theme.accentSoft
                             : control.hovered ? Theme.surfaceHover : Theme.surface
-        border.color: control.activeFocus ? Theme.accent : Theme.line
-        border.width: control.activeFocus ? 2 : 1
+        border.color: control.visualFocus ? Theme.accent : Theme.line
+        border.width: control.visualFocus ? 2 : 1
         Behavior on color {
             ColorAnimation { duration: 140 }
         }
@@ -107,7 +107,7 @@ T.Button {
 
     PickerToolTip {
         anchorItem: control
-        requested: control.hovered || control.activeFocus
+        requested: control.hovered || control.visualFocus
         text: control.variantCount > 0
               ? qsTr("Choose %1 or a skin tone").arg(control.emojiName)
               : control.emojiName

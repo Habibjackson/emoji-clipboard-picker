@@ -145,12 +145,14 @@ T.ApplicationWindow {
                 IconButton {
                     iconName: window.controller.themeMode
                     accessibilityLabel: qsTr("Theme: %1").arg(window.themeModeLabel)
+                    toolTipBlocked: themePopup.visible
                     onClicked: themePopup.open()
                 }
                 IconButton {
                     iconName: "menu"
                     accessibilityLabel: qsTr("More actions")
                     selected: actionsPopup.visible
+                    toolTipBlocked: actionsPopup.visible
                     onClicked: actionsPopup.open()
                 }
                 IconButton {

@@ -30,8 +30,8 @@ T.Control {
     background: Rectangle {
         radius: Theme.smallRadius
         color: card.hovered ? Theme.surfaceHover : Theme.surface
-        border.color: card.activeFocus ? Theme.accent : Theme.line
-        border.width: card.activeFocus ? 2 : 1
+        border.color: card.visualFocus ? Theme.accent : Theme.line
+        border.width: card.visualFocus ? 2 : 1
         Behavior on color {
             ColorAnimation { duration: 150 }
         }

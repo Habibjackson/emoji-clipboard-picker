@@ -9,6 +9,8 @@ T.Button {
     property string toolTipText: accessibilityLabel
     property bool selected: false
     property bool prominent: false
+    property bool toolTipDismissed: false
+    property bool toolTipBlocked: false
 
     implicitWidth: Theme.layoutSize(44)
     implicitHeight: Theme.layoutSize(44)
@@ -17,6 +19,23 @@ T.Button {
     Accessible.name: accessibilityLabel
     Keys.onReturnPressed: control.clicked()
     Keys.onEnterPressed: control.clicked()
+    onHoveredChanged: {
+        if (!hovered && !toolTipBlocked)
+            toolTipDismissed = false
+    }
+    onActiveFocusChanged: {
+        if (!activeFocus && !hovered && !toolTipBlocked)
+            toolTipDismissed = false
+    }
+    onToolTipBlockedChanged: {
+        if (!toolTipBlocked && !hovered)
+            toolTipDismissed = false
+    }
+
+    Connections {
+        target: control
+        function onClicked() { control.toolTipDismissed = true }
+    }
 
     contentItem: Item {
         implicitWidth: Theme.layoutSize(24)
@@ -42,8 +61,8 @@ T.Button {
                                  : control.selected ? Theme.accentSoft
                                                     : control.down || control.hovered
                                                       ? Theme.surfaceHover : "transparent"
-        border.color: control.activeFocus ? Theme.accent : "transparent"
-        border.width: control.activeFocus ? 2 : 0
+        border.color: control.visualFocus ? Theme.accent : "transparent"
+        border.width: control.visualFocus ? 2 : 0
         Behavior on color {
             ColorAnimation { duration: 150 }
         }
@@ -51,7 +70,8 @@ T.Button {
 
     PickerToolTip {
         anchorItem: control
-        requested: control.enabled && (control.hovered || control.activeFocus)
+        requested: control.enabled && !control.toolTipDismissed && !control.toolTipBlocked
+                   && (control.hovered || control.visualFocus)
         text: control.toolTipText
     }
 }
