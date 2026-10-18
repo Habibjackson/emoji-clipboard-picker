@@ -158,6 +158,8 @@ export default class EmojiKeyboardExtension extends Extension {
             const frame = picker.get_frame_rect();
             if (frame.width <= 0 || frame.height <= 0)
                 return false;
+            if (!picker.is_above())
+                picker.make_above();
             let monitor = picker.get_monitor();
             for (let index = 0; index < global.display.get_n_monitors(); index++) {
                 const geometry = global.display.get_monitor_geometry(index);

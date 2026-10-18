@@ -23,7 +23,7 @@ T.ApplicationWindow {
                                                 ? qsTr("Ctrl+Shift+V") : qsTr("Auto detect")
 
     visible: false
-    flags: Qt.Tool | Qt.FramelessWindowHint
+    flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
     color: "transparent"
     width: Math.min(Theme.layoutSize(340), availableWidth - 24)
     height: Math.min(Theme.layoutSize(390), availableHeight - 24)

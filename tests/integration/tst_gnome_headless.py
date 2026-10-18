@@ -77,6 +77,10 @@ def install_test_input(extension: Path) -> None:
         '      <arg name="y" type="i" direction="out"/>\n'
         '      <arg name="width" type="i" direction="out"/>\n'
         '      <arg name="height" type="i" direction="out"/>\n'
+        '    </method>\n'
+        '    <method name="PickerAboveTarget">\n'
+        '      <arg name="title" type="s" direction="in"/>\n'
+        '      <arg name="above" type="b" direction="out"/>\n'
         '    </method>\n' + interface_anchor)
     contents = contents.replace(method_anchor,
         '''    InjectKey(key) {
@@ -131,6 +135,16 @@ def install_test_input(extension: Path) -> None:
             return [0, 0, 0, 0];
         const frame = picker.get_frame_rect();
         return [frame.x, frame.y, frame.width, frame.height];
+    }
+
+    PickerAboveTarget(title) {
+        const windows = global.display.list_all_windows();
+        const picker = windows.find(window => window.get_title() === 'Emoji Keyboard');
+        const target = windows.find(window => window.get_title() === title);
+        if (!picker || !target || !picker.showing_on_its_workspace())
+            return false;
+        const stacked = global.display.sort_windows_by_stacking([picker, target]);
+        return stacked.indexOf(picker) > stacked.indexOf(target);
     }
 
     InjectShortcut(view) {
@@ -293,6 +307,15 @@ def picker_frame() -> tuple[int, int, int, int]:
     if result.returncode:
         raise RuntimeError(f"Could not read picker frame: {result.stderr.strip()}")
     return ast.literal_eval(result.stdout.strip())
+
+
+def picker_above_target(title: str) -> bool:
+    result = bus_call("org.emojikeyboard.ClipboardProbe",
+                      "org.emojikeyboard.ClipboardProbe.PickerAboveTarget",
+                      "/org/emojikeyboard/ClipboardProbe", title)
+    if result.returncode:
+        raise RuntimeError(f"Could not read picker stacking: {result.stderr.strip()}")
+    return "true" in result.stdout.lower()
 
 
 def wait_for_picker_near(x: int, y: int, flip: bool) -> None:
@@ -624,12 +647,16 @@ def check_child(test_root: Path) -> int:
             wait_for_file(result_path, "IMAGE 2x2")
             wait_for_focus(title)
             wait_for_view("clipboard")
+            if not picker_above_target(title):
+                raise RuntimeError("Clipboard picker is hidden behind the paste target")
             result_path.unlink(missing_ok=True)
             focus_title("Emoji Keyboard")
             inject_key(28)
             wait_for_file(result_path, "IMAGE 2x2")
             wait_for_focus(title)
             wait_for_view("clipboard")
+            if not picker_above_target(title):
+                raise RuntimeError("Clipboard picker is hidden after the second paste")
             print("Qt Wayland: history stays open and pastes a second selection")
 
             preview_path = test_root / "clipboard-preview.png"
