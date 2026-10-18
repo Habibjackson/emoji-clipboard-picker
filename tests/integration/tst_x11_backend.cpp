@@ -215,7 +215,7 @@ void X11BackendTest::clipboardShortcutsAndPaste()
     for (const auto &entry : store.entries()) {
         if (entry.id == textId) {
             QVERIFY(entry.pinned);
-            QVERIFY(entry.usedAt > previousUse);
+            QCOMPARE(entry.usedAt, previousUse);
         }
     }
 
@@ -232,6 +232,19 @@ void X11BackendTest::clipboardShortcutsAndPaste()
     controller.copyEntry(imageId);
     QTRY_COMPARE_WITH_TIMEOUT(pasteSpy.size(), 3, 3000);
     QTRY_COMPARE_WITH_TIMEOUT(pastedText(resultPath), QStringLiteral("IMAGE 2x2"), 3000);
+    QVERIFY(picker.isVisible());
+
+    controller.copyEntry(textId);
+    QTRY_COMPARE_WITH_TIMEOUT(pasteSpy.size(), 4, 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(pastedText(resultPath), QStringLiteral("X11 source text"), 3000);
+    QVERIFY(picker.isVisible());
+
+    picker.hide();
+    QTest::qWait(30);
+    controller.copyEntry(imageId);
+    QTest::qWait(100);
+    QCOMPARE(pasteSpy.size(), 4);
+    QCOMPARE(pastedText(resultPath), QStringLiteral("X11 source text"));
 
     sendShortcut(display, XK_period);
     QTRY_COMPARE_WITH_TIMEOUT(shortcutSpy.size(), 6, 3000);
@@ -241,8 +254,8 @@ void X11BackendTest::clipboardShortcutsAndPaste()
     QTest::qWait(30);
     controller.copyEmoji(QStringLiteral("🪐"));
     QTest::qWait(100);
-    QCOMPARE(pasteSpy.size(), 3);
-    QCOMPARE(pastedText(resultPath), QStringLiteral("IMAGE 2x2"));
+    QCOMPARE(pasteSpy.size(), 4);
+    QCOMPARE(pastedText(resultPath), QStringLiteral("X11 source text"));
 
     target.terminate();
     QVERIFY(target.waitForFinished(3000));
@@ -258,16 +271,16 @@ void X11BackendTest::clipboardShortcutsAndPaste()
     sendShortcut(display, XK_period);
     QTRY_COMPARE_WITH_TIMEOUT(shortcutSpy.size(), 8, 3000);
     controller.copyEmoji(QStringLiteral("🧪"));
-    QTRY_COMPARE_WITH_TIMEOUT(pasteSpy.size(), 4, 3000);
-    QCOMPARE(pasteSpy.at(3).at(0).toString(), QStringLiteral("Ctrl+Shift+V"));
+    QTRY_COMPARE_WITH_TIMEOUT(pasteSpy.size(), 5, 3000);
+    QCOMPARE(pasteSpy.at(4).at(0).toString(), QStringLiteral("Ctrl+Shift+V"));
     QTRY_COMPARE_WITH_TIMEOUT(pastedText(resultPath), QStringLiteral("🧪"), 3000);
 
     controller.setPasteShortcutMode(QStringLiteral("ctrl-v"));
     sendShortcut(display, XK_period);
     QTRY_COMPARE_WITH_TIMEOUT(shortcutSpy.size(), 9, 3000);
     controller.copyEmoji(QStringLiteral("👀"));
-    QTRY_COMPARE_WITH_TIMEOUT(pasteSpy.size(), 5, 3000);
-    QCOMPARE(pasteSpy.at(4).at(0).toString(), QStringLiteral("Ctrl+V"));
+    QTRY_COMPARE_WITH_TIMEOUT(pasteSpy.size(), 6, 3000);
+    QCOMPARE(pasteSpy.at(5).at(0).toString(), QStringLiteral("Ctrl+V"));
     QCOMPARE(pastedText(resultPath), QStringLiteral("🧪"));
     controller.setPasteShortcutMode(QStringLiteral("auto"));
 
@@ -277,7 +290,7 @@ void X11BackendTest::clipboardShortcutsAndPaste()
     QVERIFY(target.waitForFinished(3000));
     controller.copyEmoji(QStringLiteral("🥑"));
     QTRY_VERIFY_WITH_TIMEOUT(controller.status().contains(QStringLiteral("Target window is gone")), 3000);
-    QCOMPARE(pasteSpy.size(), 5);
+    QCOMPARE(pasteSpy.size(), 6);
     QCOMPARE(QGuiApplication::clipboard()->text(), QStringLiteral("🥑"));
     XCloseDisplay(display);
 }

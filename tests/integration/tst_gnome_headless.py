@@ -623,7 +623,14 @@ def check_child(test_root: Path) -> int:
             inject_key(28)
             wait_for_file(result_path, "IMAGE 2x2")
             wait_for_focus(title)
-            print("Qt Wayland: saved image history pasted into the target")
+            wait_for_view("clipboard")
+            result_path.unlink(missing_ok=True)
+            focus_title("Emoji Keyboard")
+            inject_key(28)
+            wait_for_file(result_path, "IMAGE 2x2")
+            wait_for_focus(title)
+            wait_for_view("clipboard")
+            print("Qt Wayland: history stays open and pastes a second selection")
 
             preview_path = test_root / "clipboard-preview.png"
             preview = subprocess.run([str(ROOT / "build/emoji-keyboard"), "--clipboard",

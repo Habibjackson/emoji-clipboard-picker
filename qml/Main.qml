@@ -47,7 +47,10 @@ T.ApplicationWindow {
 
     Connections {
         target: window.controller
-        function onItemCopied() { window.hide() }
+        function onItemCopied() {
+            if (window.currentView !== "clipboard")
+                window.hide()
+        }
     }
 
     Binding {

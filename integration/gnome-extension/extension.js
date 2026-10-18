@@ -203,13 +203,12 @@ export default class EmojiKeyboardExtension extends Extension {
 
     PasteSelectionAsync([shortcutMode], invocation) {
         const target = this._targetWindow;
-        this._targetWindow = null;
         const generation = ++this._pasteGeneration;
         const openClipboardRevision = this._openClipboardRevision;
         const clipboardRevision = openClipboardRevision !== null
             && this._clipboardRevision === openClipboardRevision + 1
             ? this._clipboardRevision : 0;
-        this._openClipboardRevision = null;
+        this._openClipboardRevision = this._clipboardRevision;
         const finish = (status, shortcut = '') => {
             invocation.return_value(new GLib.Variant('(ssu)',
                 [status, shortcut, clipboardRevision]));

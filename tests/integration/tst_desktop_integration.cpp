@@ -269,14 +269,26 @@ void DesktopIntegrationTest::gnomePasteModeAndCancellation()
     controller.copyEntry(store.entries().first().id);
     QTRY_COMPARE_WITH_TIMEOUT(probe.pasteCount, 1, 3000);
     QCOMPARE(probe.lastMode, QStringLiteral("ctrl-shift-v"));
+    QVERIFY(window.isVisible());
+
+    controller.copyEntry(store.entries().first().id);
+    QTRY_COMPARE_WITH_TIMEOUT(probe.pasteCount, 2, 3000);
+    QVERIFY(window.isVisible());
+
+    window.hide();
+    QTRY_VERIFY_WITH_TIMEOUT(probe.cancelCount > 0, 3000);
+    controller.copyEntry(store.entries().first().id);
+    QTest::qWait(100);
+    QCOMPARE(probe.pasteCount, 2);
+    const int cancelsAfterHide = probe.cancelCount;
 
     QCOMPARE(service.ShowFromShortcut(QStringLiteral("clipboard"), false),
              uint(QCoreApplication::applicationPid()));
     controller.copyEntry(store.entries().first().id);
     backend.cancel();
     QTest::qWait(100);
-    QCOMPARE(probe.pasteCount, 1);
-    QTRY_VERIFY_WITH_TIMEOUT(probe.cancelCount > 0, 3000);
+    QCOMPARE(probe.pasteCount, 2);
+    QTRY_VERIFY_WITH_TIMEOUT(probe.cancelCount > cancelsAfterHide, 3000);
 
     bus.unregisterService(QStringLiteral("org.emojikeyboard.ClipboardProbe"));
     bus.unregisterObject(QStringLiteral("/org/emojikeyboard/ClipboardProbe"));

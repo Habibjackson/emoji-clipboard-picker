@@ -38,7 +38,6 @@ public:
     bool addText(const QString &text);
     bool addImage(const QByteArray &png, const QByteArray &thumbnail);
     bool setPinned(qint64 id, bool pinned);
-    bool touch(qint64 id);
     bool remove(qint64 id);
     bool clearRecent();
     bool clearAll();

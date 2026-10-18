@@ -373,8 +373,6 @@ void AppController::copyEntry(qint64 id)
         m_ownContentHash = contentHash(kind, data);
         m_clipboard->setText(QString::fromUtf8(data));
     }
-    m_store->touch(id);
-    m_clipboardModel.reload();
     setAttention(QString());
     setStatus(tr("Item copied. Paste it in your app."));
     emit itemCopied();

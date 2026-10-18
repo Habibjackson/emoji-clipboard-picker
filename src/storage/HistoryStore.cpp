@@ -360,22 +360,6 @@ bool HistoryStore::setPinned(qint64 id, bool pinned)
     return true;
 }
 
-bool HistoryStore::touch(qint64 id)
-{
-    if (!isOpen())
-        return false;
-    QSqlQuery query(m_database);
-    query.prepare(QStringLiteral("UPDATE clipboard_entries SET used_at = ? WHERE id = ?"));
-    query.addBindValue(nextTimestamp());
-    query.addBindValue(id);
-    if (!query.exec()) {
-        setError(query.lastError().text());
-        return false;
-    }
-    m_error.clear();
-    return query.numRowsAffected() > 0;
-}
-
 bool HistoryStore::remove(qint64 id)
 {
     if (!isOpen())

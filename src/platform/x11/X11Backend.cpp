@@ -21,7 +21,6 @@
 
 #include <algorithm>
 #include <array>
-#include <utility>
 
 namespace {
 Display *trappedDisplay = nullptr;
@@ -151,7 +150,9 @@ X11Backend::X11Backend(QQuickWindow *window, AppController *controller,
     connect(m_window, &QWindow::visibleChanged, this, [this](bool visible) {
         if (!visible) {
             QTimer::singleShot(0, this, [this] {
-                if (!m_pastePending && (!m_window || !m_window->isVisible()))
+                if (m_window && !m_window->isVisible()
+                    && (!m_pastePending || m_window->property("currentView").toString()
+                                              == QStringLiteral("clipboard")))
                     cancel();
             });
         }
@@ -164,7 +165,8 @@ X11Backend::X11Backend(QQuickWindow *window, AppController *controller,
                 m_controller->discardEmojiClipboardSnapshot();
             return;
         }
-        m_shortcutArmed = false;
+        m_shortcutArmed = m_window
+            && m_window->property("currentView").toString() == QStringLiteral("clipboard");
         m_pastePending = true;
         XSync(m_display, False);
         processEvents();
@@ -351,7 +353,9 @@ void X11Backend::openView(const QString &view)
 
 void X11Backend::pasteSelection(bool, quint64 snapshotGeneration)
 {
-    const Window target = std::exchange(m_target, None);
+    const Window target = m_target;
+    if (!m_shortcutArmed)
+        m_target = None;
     if (m_controller && m_controller->emojiClipboardSnapshotGeneration()
         != snapshotGeneration) {
         m_pastePending = false;

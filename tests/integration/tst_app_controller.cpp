@@ -45,6 +45,7 @@ class AppControllerTest : public QObject
 
 private slots:
     void capturesAndCopies();
+    void selectingHistoryKeepsItsOrder();
     void capturesCommonMimeFormatsAndPrefersImage();
     void capturesShellClipboardPayload();
     void skipsUnsafeOrUnsupportedClipboardItems();
@@ -127,6 +128,38 @@ void AppControllerTest::capturesAndCopies()
     QVERIFY(store.entries().isEmpty());
     QCOMPARE(controller.clipboardModel()->resultCount(), 0);
     QCOMPARE(controller.status(), QStringLiteral("All clipboard history cleared"));
+}
+
+void AppControllerTest::selectingHistoryKeepsItsOrder()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QVERIFY(store.open());
+    QGuiApplication::clipboard()->clear();
+    QVERIFY(store.addText(QStringLiteral("older")));
+    QVERIFY(store.addText(QStringLiteral("newer")));
+    const auto before = store.entries();
+    QCOMPARE(before.size(), 2);
+    QCOMPARE(before.at(0).text, QStringLiteral("newer"));
+    QCOMPARE(before.at(1).text, QStringLiteral("older"));
+
+    AppController controller(&store, QStringLiteral("clipboard"));
+    controller.copyEntry(before.at(1).id);
+    controller.captureNow();
+    QCOMPARE(QGuiApplication::clipboard()->text(), QStringLiteral("older"));
+    const auto after = store.entries();
+    QCOMPARE(after.size(), 2);
+    for (int i = 0; i < before.size(); ++i) {
+        QCOMPARE(after.at(i).id, before.at(i).id);
+        QCOMPARE(after.at(i).usedAt, before.at(i).usedAt);
+    }
+    QCOMPARE(controller.clipboardModel()->data(controller.clipboardModel()->index(0),
+                                               ClipboardModel::EntryIdRole).toLongLong(),
+             before.at(0).id);
+
+    QVERIFY(store.addText(QStringLiteral("older")));
+    QCOMPARE(store.entries().first().id, before.at(1).id);
 }
 
 void AppControllerTest::capturesCommonMimeFormatsAndPrefersImage()

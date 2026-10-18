@@ -25,7 +25,9 @@ GnomeBackend::GnomeBackend(QQuickWindow *window, AppController *controller, QObj
     connect(m_window, &QWindow::visibleChanged, this, [this](bool visible) {
         if (!visible) {
             QTimer::singleShot(0, this, [this] {
-                if (!m_pastePending && m_window && !m_window->isVisible())
+                if (m_window && !m_window->isVisible()
+                    && (!m_pastePending || m_window->property("currentView").toString()
+                                              == QStringLiteral("clipboard")))
                     cancel();
             });
         }
@@ -39,7 +41,8 @@ GnomeBackend::GnomeBackend(QQuickWindow *window, AppController *controller, QObj
                 m_controller->discardEmojiClipboardSnapshot();
             return;
         }
-        m_shortcutTargetArmed = false;
+        m_shortcutTargetArmed = m_window
+            && m_window->property("currentView").toString() == QStringLiteral("clipboard");
         m_pastePending = true;
         m_pasteDispatched = false;
         const quint64 pasteGeneration = ++m_pasteGeneration;
@@ -154,10 +157,12 @@ void GnomeBackend::pasteSelection(bool emoji, quint64 snapshotGeneration)
     auto *watcher = new QDBusPendingCallWatcher(bus.asyncCall(message), this);
     connect(watcher, &QDBusPendingCallWatcher::finished,
             this, [this, watcher, emoji, snapshotGeneration, pasteGeneration] {
-        if (pasteGeneration == m_pasteGeneration) {
-            m_pastePending = false;
-            m_pasteDispatched = false;
+        if (pasteGeneration != m_pasteGeneration) {
+            watcher->deleteLater();
+            return;
         }
+        m_pastePending = false;
+        m_pasteDispatched = false;
         const QDBusPendingReply<QString, QString, uint> reply = *watcher;
         if (m_controller && m_controller->emojiClipboardSnapshotGeneration()
             == snapshotGeneration) {
@@ -182,6 +187,8 @@ void GnomeBackend::pasteSelection(bool emoji, quint64 snapshotGeneration)
                 }
             }
         }
+        if (m_window && !m_window->isVisible())
+            cancel();
         watcher->deleteLater();
     });
 }
