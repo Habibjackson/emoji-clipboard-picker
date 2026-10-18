@@ -25,9 +25,7 @@ GnomeBackend::GnomeBackend(QQuickWindow *window, AppController *controller, QObj
     connect(m_window, &QWindow::visibleChanged, this, [this](bool visible) {
         if (!visible) {
             QTimer::singleShot(0, this, [this] {
-                if (m_window && !m_window->isVisible()
-                    && (!m_pastePending || m_window->property("currentView").toString()
-                                              == QStringLiteral("clipboard")))
+                if (m_window && !m_window->isVisible())
                     cancel();
             });
         }
@@ -41,8 +39,7 @@ GnomeBackend::GnomeBackend(QQuickWindow *window, AppController *controller, QObj
                 m_controller->discardEmojiClipboardSnapshot();
             return;
         }
-        m_shortcutTargetArmed = m_window
-            && m_window->property("currentView").toString() == QStringLiteral("clipboard");
+        m_shortcutTargetArmed = m_window && m_window->isVisible();
         m_pastePending = true;
         m_pasteDispatched = false;
         const quint64 pasteGeneration = ++m_pasteGeneration;
@@ -172,9 +169,7 @@ void GnomeBackend::pasteSelection(bool emoji, quint64 snapshotGeneration)
             } else {
                 m_controller->reportPasteResult(reply.argumentAt<0>(), reply.argumentAt<1>());
                 if (reply.argumentAt<0>() == QStringLiteral("sent") && m_window
-                    && m_window->isVisible()
-                    && m_window->property("currentView").toString()
-                        == QStringLiteral("clipboard")) {
+                    && m_window->isVisible()) {
                     auto raise = QDBusMessage::createMethodCall(
                         QStringLiteral("org.emojikeyboard.ClipboardProbe"),
                         QStringLiteral("/org/emojikeyboard/ClipboardProbe"),

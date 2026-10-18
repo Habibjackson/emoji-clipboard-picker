@@ -112,7 +112,7 @@ class SetupTests(unittest.TestCase):
     def test_recheck_accepts_custom_keys_and_reports_real_overlap(self):
         self.values["emoji"] = ["<Super>e"]
         self.values["clipboard"] = ["<Control><Alt>b"]
-        bridge_methods = "PositionPicker(\nRaisePicker("
+        bridge_methods = "PositionPicker(\nRaisePicker(\nGetBridgeVersion("
         for name in ("bin", "desktop", "dbus", "unit"):
             self.paths[name].parent.mkdir(parents=True, exist_ok=True)
             self.paths[name].write_text("installed")
@@ -139,7 +139,7 @@ class SetupTests(unittest.TestCase):
             self.assertEqual(setup.status(self.paths, recheck=True), 1)
             self.assertIn("ibus shortcut conflict", output.getvalue())
             self.values["ibus"].pop()
-            bridge_methods = "PositionPicker("
+            bridge_methods = "PositionPicker(\nRaisePicker("
             output.truncate(0)
             output.seek(0)
             self.assertEqual(setup.status(self.paths, recheck=True), 1)

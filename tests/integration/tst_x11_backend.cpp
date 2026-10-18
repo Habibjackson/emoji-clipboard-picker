@@ -210,6 +210,10 @@ void X11BackendTest::clipboardShortcutsAndPaste()
     controller.copyEmoji(QStringLiteral("😀"));
     QTRY_COMPARE_WITH_TIMEOUT(pasteSpy.size(), 1, 3000);
     QTRY_COMPARE_WITH_TIMEOUT(pastedText(resultPath), QStringLiteral("😀"), 3000);
+    QVERIFY(picker.isVisible());
+    QTRY_VERIFY_WITH_TIMEOUT(stackedAbove(display, Window(picker.winId()), targetWindow), 3000);
+    QTRY_VERIFY_WITH_TIMEOUT((XGetInputFocus(display, &focused, &revert),
+                              focused == targetWindow), 3000);
 
     sendShortcut(display, XK_v);
     QTRY_COMPARE_WITH_TIMEOUT(shortcutSpy.size(), 4, 3000);

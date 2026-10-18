@@ -28,6 +28,9 @@ const INTERFACE_XML = `
       <arg name="image" type="u" direction="out"/>
       <arg name="other" type="u" direction="out"/>
     </method>
+    <method name="GetBridgeVersion">
+      <arg name="version" type="u" direction="out"/>
+    </method>
     <method name="ShowEmoji"/>
     <method name="ShowClipboard"/>
     <method name="PositionPicker">
@@ -70,6 +73,7 @@ export default class EmojiKeyboardExtension extends Extension {
         this._pickerPid = 0;
         this._pasteGeneration = 0;
         this._positionSource = 0;
+        this._focusSignal = 0;
         try {
             this._bus = Gio.bus_get_sync(Gio.BusType.SESSION, null);
             this._exported = Gio.DBusExportedObject.wrapJSObject(INTERFACE_XML, this);
@@ -79,6 +83,12 @@ export default class EmojiKeyboardExtension extends Extension {
             this._selection = global.display.get_selection();
             this._selectionSignal = this._selection.connect('owner-changed',
                 (_selection, selectionType) => this._onOwnerChanged(selectionType));
+            this._focusSignal = global.display.connect('notify::focus-window', () => {
+                const focused = global.display.get_focus_window();
+                if (this._pickerPid && focused?.get_pid() === this._pickerPid
+                    && focused.get_title() === 'Emoji Keyboard')
+                    this._openClipboardRevision = this._clipboardRevision;
+            });
             this._settings = this.getSettings();
             Main.wm.addKeybinding('show-emoji', this._settings,
                 Meta.KeyBindingFlags.NONE, Shell.ActionMode.NORMAL,
@@ -121,6 +131,10 @@ export default class EmojiKeyboardExtension extends Extension {
             this._selection.disconnect(this._selectionSignal);
             this._selectionSignal = 0;
         }
+        if (this._focusSignal) {
+            global.display.disconnect(this._focusSignal);
+            this._focusSignal = 0;
+        }
         this._selection = null;
         if (this._busOwner) {
             Gio.bus_unown_name(this._busOwner);
@@ -137,6 +151,10 @@ export default class EmojiKeyboardExtension extends Extension {
         return [counts.total, counts.text, counts.image, counts.other];
     }
 
+    GetBridgeVersion() {
+        return 2;
+    }
+
     ShowEmoji() {
         this._showPicker('ShowEmoji');
     }
@@ -148,6 +166,7 @@ export default class EmojiKeyboardExtension extends Extension {
     PositionPicker(pid) {
         if (!pid)
             return;
+        this._pickerPid = pid;
         if (this._positionSource) {
             GLib.source_remove(this._positionSource);
             this._positionSource = 0;

@@ -476,6 +476,12 @@ void AppControllerTest::snapshotsSupportedClipboardBeforeEmoji()
     QCOMPARE(mimeType, QStringLiteral("text/plain;charset=utf-8"));
     QCOMPARE(QString::fromUtf8(content), QStringLiteral("previous text"));
 
+    controller.copyEmoji(QString::fromUtf8("🧪"));
+    QVERIFY(controller.emojiClipboardSnapshot(&temporaryText, &mimeType, &content));
+    QCOMPARE(temporaryText, QString::fromUtf8("🧪"));
+    QCOMPARE(mimeType, QStringLiteral("text/plain;charset=utf-8"));
+    QCOMPARE(QString::fromUtf8(content), QStringLiteral("previous text"));
+
     QImage image(32, 24, QImage::Format_ARGB32);
     image.fill(Qt::blue);
     clipboard->setImage(image);

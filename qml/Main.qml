@@ -45,14 +45,6 @@ T.ApplicationWindow {
         }
     }
 
-    Connections {
-        target: window.controller
-        function onItemCopied() {
-            if (window.currentView !== "clipboard")
-                window.hide()
-        }
-    }
-
     Binding {
         target: Theme
         property: "mode"

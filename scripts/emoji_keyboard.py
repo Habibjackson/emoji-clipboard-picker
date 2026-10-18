@@ -435,7 +435,8 @@ def status(paths: dict[str, Path], recheck: bool) -> int:
                              "/org/emojikeyboard/ClipboardProbe", check=False)
                 current_bridge = (bridge.returncode == 0
                                   and "PositionPicker(" in bridge.stdout
-                                  and "RaisePicker(" in bridge.stdout)
+                                  and "RaisePicker(" in bridge.stdout
+                                  and "GetBridgeVersion(" in bridge.stdout)
             except FileNotFoundError:
                 pass
             if current_bridge is False:

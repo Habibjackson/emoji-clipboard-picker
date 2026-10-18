@@ -559,10 +559,18 @@ void AppController::discardEmojiClipboardSnapshot()
 
 void AppController::snapshotClipboardBeforeEmoji(const QString &symbol)
 {
-    discardEmojiClipboardSnapshot();
     m_expectedRestoreHash.clear();
     m_restoreSuppressionExpiresAt = 0;
     m_restoreObserved = false;
+    if (m_snapshotKind != SnapshotKind::None && !m_temporaryEmoji.isEmpty()
+        && m_ownContentHash == contentHash(QStringLiteral("text"),
+                                           m_temporaryEmoji.toUtf8())
+        && m_clipboard->text() == m_temporaryEmoji) {
+        ++m_snapshotGeneration;
+        m_temporaryEmoji = symbol;
+        return;
+    }
+    discardEmojiClipboardSnapshot();
     const QMimeData *mime = m_clipboard->mimeData();
     if (!mime || mime->hasUrls() || privateClipboard(mime)) {
         return;

@@ -226,6 +226,17 @@ def wait_for_file(path: Path, expected: str, timeout: float = 5) -> None:
     raise RuntimeError(f"Target paste result: expected {expected!r}, got {actual!r}")
 
 
+def wait_for_nonempty_file(path: Path, timeout: float = 5) -> str:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if path.exists():
+            content = path.read_text()
+            if content:
+                return content
+        time.sleep(0.1)
+    raise RuntimeError(f"Target paste result remained empty: {path}")
+
+
 def wait_for_focus(title: str) -> None:
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
@@ -620,6 +631,7 @@ def check_child(test_root: Path) -> int:
             wait_for_history(test_root, "text")
             inject_shortcut("emoji")
             wait_for_view("emoji")
+            set_window_above(title, True)
             for key in (15, 15, 28):  # Search, categories, grid, then first emoji.
                 inject_key(key)
                 time.sleep(0.2)
@@ -634,9 +646,13 @@ def check_child(test_root: Path) -> int:
                 raise RuntimeError(f"{error}; focus={focus.stdout.strip()}; "
                                    f"status={status.stdout.strip()}") from error
             wait_for_focus(title)
+            wait_for_view("emoji")
+            if not picker_above_target(title):
+                raise RuntimeError("Emoji picker is hidden behind the paste target")
             time.sleep(1)
             inject_key(19)  # R: read clipboard after the temporary emoji is restored.
             wait_for_file(Path(str(result_path) + ".clipboard"), "GNOME test prior text")
+            set_window_above(title, False)
             print("Qt Wayland: focus, emoji paste, and prior text restoration passed")
 
             inject_key(23)  # I: copy a synthetic image from the focused Qt window.
@@ -647,11 +663,24 @@ def check_child(test_root: Path) -> int:
 
             result_path.unlink(missing_ok=True)
             Path(str(result_path) + ".clipboard").unlink(missing_ok=True)
-            inject_shortcut("emoji")
             wait_for_view("emoji")
+            focus_title("Emoji Keyboard")
             time.sleep(0.35)
-            inject_key(28)  # Grid focus remains on the previously used first emoji.
-            wait_for_file(result_path, "😀")
+            for key in (15, 15, 28):  # Search, categories, grid, then first emoji.
+                inject_key(key)
+                time.sleep(0.2)
+            try:
+                pasted_emoji = wait_for_nonempty_file(result_path)
+                if len(pasted_emoji) > 8:
+                    raise RuntimeError(f"Unexpected emoji paste: {pasted_emoji!r}")
+            except RuntimeError as error:
+                focus = bus_call("org.emojikeyboard.ClipboardProbe",
+                                 "org.emojikeyboard.ClipboardProbe.FocusedTitle",
+                                 "/org/emojikeyboard/ClipboardProbe")
+                status = bus_call("org.emojikeyboard.App", "org.emojikeyboard.App.CurrentStatus",
+                                  "/org/emojikeyboard/App")
+                raise RuntimeError(f"{error}; focus={focus.stdout.strip()}; "
+                                   f"status={status.stdout.strip()}") from error
             wait_for_focus(title)
             time.sleep(1)
             inject_key(19)

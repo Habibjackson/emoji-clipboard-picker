@@ -150,9 +150,7 @@ X11Backend::X11Backend(QQuickWindow *window, AppController *controller,
     connect(m_window, &QWindow::visibleChanged, this, [this](bool visible) {
         if (!visible) {
             QTimer::singleShot(0, this, [this] {
-                if (m_window && !m_window->isVisible()
-                    && (!m_pastePending || m_window->property("currentView").toString()
-                                              == QStringLiteral("clipboard")))
+                if (m_window && !m_window->isVisible())
                     cancel();
             });
         }
@@ -165,8 +163,7 @@ X11Backend::X11Backend(QQuickWindow *window, AppController *controller,
                 m_controller->discardEmojiClipboardSnapshot();
             return;
         }
-        m_shortcutArmed = m_window
-            && m_window->property("currentView").toString() == QStringLiteral("clipboard");
+        m_shortcutArmed = m_window && m_window->isVisible();
         m_pastePending = true;
         XSync(m_display, False);
         processEvents();
@@ -490,12 +487,9 @@ void X11Backend::sendPaste(unsigned long target, bool emoji, quint64 snapshotGen
     XFlush(m_display);
     m_controller->reportPasteResult(QStringLiteral("sent"), shortcut);
     emit pasteSent(shortcut);
-    if (m_window && m_window->isVisible()
-        && m_window->property("currentView").toString() == QStringLiteral("clipboard")) {
+    if (m_window && m_window->isVisible()) {
         QTimer::singleShot(0, this, [this] {
-            if (m_window && m_window->isVisible()
-                && m_window->property("currentView").toString()
-                    == QStringLiteral("clipboard"))
+            if (m_window && m_window->isVisible())
                 m_window->raise();
         });
     }
