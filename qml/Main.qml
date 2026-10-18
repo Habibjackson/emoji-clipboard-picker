@@ -8,6 +8,7 @@ T.ApplicationWindow {
     id: window
 
     required property AppController controller
+    required property SystemAppearance systemAppearance
     property string currentView: controller.initialView
     readonly property int availableWidth: Screen.width > 0 ? Screen.width : 720
     readonly property int availableHeight: Screen.height > 0 ? Screen.height : 520
@@ -38,6 +39,9 @@ T.ApplicationWindow {
         color: Theme.canvas
         border.color: Theme.line
         border.width: 1
+        Behavior on color {
+            ColorAnimation { duration: 180 }
+        }
     }
 
     Connections {
@@ -49,6 +53,11 @@ T.ApplicationWindow {
         target: Theme
         property: "mode"
         value: window.controller.themeMode
+    }
+    Binding {
+        target: Theme
+        property: "systemDark"
+        value: window.systemAppearance.dark
     }
 
     ColumnLayout {
@@ -62,6 +71,9 @@ T.ApplicationWindow {
             Layout.preferredHeight: Theme.layoutSize(44)
             radius: Theme.smallRadius
             color: Theme.rail
+            Behavior on color {
+                ColorAnimation { duration: 180 }
+            }
 
             Row {
                 id: viewTabs
@@ -93,11 +105,17 @@ T.ApplicationWindow {
 
                 Rectangle {
                     anchors.centerIn: parent
-                    width: Theme.layoutSize(30)
+                    width: dragHover.hovered ? Theme.layoutSize(35) : Theme.layoutSize(30)
                     height: Theme.layoutSize(4)
                     radius: height / 2
-                    color: Theme.muted
+                    color: dragHover.hovered ? Theme.accent : Theme.muted
                     Accessible.ignored: true
+                    Behavior on width {
+                        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+                    }
+                    Behavior on color {
+                        ColorAnimation { duration: 140 }
+                    }
                 }
                 DragHandler {
                     target: null
@@ -112,10 +130,8 @@ T.ApplicationWindow {
                     cursorShape: Qt.SizeAllCursor
                 }
                 PickerToolTip {
-                    parent: dragArea
-                    x: (dragArea.width - width) / 2
-                    y: dragArea.height + Theme.layoutSize(3)
-                    visible: dragHover.hovered
+                    anchorItem: dragArea
+                    requested: dragHover.hovered
                     text: qsTr("Drag to move picker")
                 }
             }
@@ -248,6 +264,12 @@ T.ApplicationWindow {
         focus: true
         closePolicy: T.Popup.CloseOnEscape | T.Popup.CloseOnPressOutside
         onOpened: systemThemeButton.forceActiveFocus()
+        enter: Transition {
+            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 150 }
+        }
+        exit: Transition {
+            NumberAnimation { property: "opacity"; from: 1; to: 0; duration: 100 }
+        }
 
         background: Rectangle {
             radius: Theme.smallRadius
@@ -304,6 +326,12 @@ T.ApplicationWindow {
         focus: true
         closePolicy: T.Popup.CloseOnEscape | T.Popup.CloseOnPressOutside
         onOpened: pauseButton.forceActiveFocus()
+        enter: Transition {
+            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 150 }
+        }
+        exit: Transition {
+            NumberAnimation { property: "opacity"; from: 1; to: 0; duration: 100 }
+        }
 
         background: Rectangle {
             radius: Theme.smallRadius
@@ -374,6 +402,12 @@ T.ApplicationWindow {
         focus: true
         closePolicy: T.Popup.CloseOnEscape | T.Popup.CloseOnPressOutside
         onOpened: autoPasteButton.forceActiveFocus()
+        enter: Transition {
+            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 150 }
+        }
+        exit: Transition {
+            NumberAnimation { property: "opacity"; from: 1; to: 0; duration: 100 }
+        }
 
         background: Rectangle {
             radius: Theme.smallRadius
@@ -431,6 +465,12 @@ T.ApplicationWindow {
         focus: true
         closePolicy: T.Popup.CloseOnEscape | T.Popup.CloseOnPressOutside
         onOpened: cancelClear.forceActiveFocus()
+        enter: Transition {
+            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 160 }
+        }
+        exit: Transition {
+            NumberAnimation { property: "opacity"; from: 1; to: 0; duration: 100 }
+        }
 
         background: Rectangle {
             radius: Theme.radius

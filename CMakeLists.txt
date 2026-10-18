@@ -65,6 +65,7 @@ qt_add_qml_module(emoji-keyboard
     SOURCES
         src/app/AppController.h src/app/AppController.cpp
         src/app/ClipboardImageProvider.h src/app/ClipboardImageProvider.cpp
+        src/platform/SystemAppearance.h src/platform/SystemAppearance.cpp
         src/models/EmojiModel.h src/models/EmojiModel.cpp
         src/models/ClipboardModel.h src/models/ClipboardModel.cpp
         src/storage/HistoryStore.h src/storage/HistoryStore.cpp
@@ -79,7 +80,7 @@ qt_add_resources(emoji-keyboard app_icon
     FILES resources/icons/org.emojikeyboard.App.svg
 )
 
-target_include_directories(emoji-keyboard PRIVATE src src/app src/models)
+target_include_directories(emoji-keyboard PRIVATE src src/app src/models src/platform)
 target_link_libraries(emoji-keyboard PRIVATE
     Qt6::Core
     Qt6::Gui
@@ -124,6 +125,15 @@ if(BUILD_TESTING)
     if(Python3_Interpreter_FOUND)
         add_test(NAME setup_installer COMMAND "${Python3_EXECUTABLE}"
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/tst_setup.py")
+        find_program(QMLTESTRUNNER_EXECUTABLE NAMES qmltestrunner
+            HINTS "${Qt6_DIR}/../../../bin")
+        if(QMLTESTRUNNER_EXECUTABLE)
+            add_test(NAME picker_tooltip COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/run_picker_tooltip.py"
+                "${QMLTESTRUNNER_EXECUTABLE}")
+            set_tests_properties(picker_tooltip PROPERTIES
+                ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
+        endif()
     endif()
     qt_add_executable(tst_history_store
         tests/unit/tst_history_store.cpp
@@ -165,6 +175,18 @@ if(BUILD_TESTING)
 
     find_program(DBUS_RUN_SESSION_EXECUTABLE NAMES dbus-run-session)
     if(DBUS_RUN_SESSION_EXECUTABLE)
+        qt_add_executable(tst_system_appearance
+            tests/unit/tst_system_appearance.cpp
+            src/platform/SystemAppearance.h src/platform/SystemAppearance.cpp)
+        target_include_directories(tst_system_appearance PRIVATE src)
+        target_link_libraries(tst_system_appearance PRIVATE
+            Qt6::DBus Qt6::Gui Qt6::Qml Qt6::Test)
+        add_test(NAME system_appearance
+            COMMAND "${DBUS_RUN_SESSION_EXECUTABLE}" --
+                "$<TARGET_FILE:tst_system_appearance>")
+        set_tests_properties(system_appearance PROPERTIES
+            ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
         qt_add_executable(tst_desktop_integration
             tests/integration/tst_desktop_integration.cpp
             src/platform/DesktopIntegration.h src/platform/DesktopIntegration.cpp

@@ -44,5 +44,8 @@ T.Button {
                                                                                       : "transparent"
         border.color: control.activeFocus ? Theme.accent : "transparent"
         border.width: control.activeFocus ? 2 : 0
+        Behavior on color {
+            ColorAnimation { duration: 150 }
+        }
     }
 }

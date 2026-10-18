@@ -46,6 +46,10 @@ T.Button {
                 verticalAlignment: Text.AlignVCenter
                 renderType: Text.NativeRendering
                 Accessible.ignored: true
+                scale: control.down ? 0.9 : control.hovered ? 1.13 : 1
+                Behavior on scale {
+                    NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+                }
             }
             Text {
                 anchors.fill: parent
@@ -85,6 +89,9 @@ T.Button {
                             : control.hovered ? Theme.surfaceHover : Theme.surface
         border.color: control.activeFocus ? Theme.accent : Theme.line
         border.width: control.activeFocus ? 2 : 1
+        Behavior on color {
+            ColorAnimation { duration: 140 }
+        }
 
         Text {
             anchors.right: parent.right
@@ -98,9 +105,9 @@ T.Button {
         }
     }
 
-    T.ToolTip {
-        visible: control.hovered
-        delay: 600
+    PickerToolTip {
+        anchorItem: control
+        requested: control.hovered || control.activeFocus
         text: control.variantCount > 0
               ? qsTr("Choose %1 or a skin tone").arg(control.emojiName)
               : control.emojiName

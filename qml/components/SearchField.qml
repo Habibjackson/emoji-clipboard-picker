@@ -20,6 +20,9 @@ T.TextField {
         color: Theme.surface
         border.color: control.activeFocus ? Theme.accent : Theme.line
         border.width: control.activeFocus ? 2 : 1
+        Behavior on color {
+            ColorAnimation { duration: 180 }
+        }
     }
 
     Text {

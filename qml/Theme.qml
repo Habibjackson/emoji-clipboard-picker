@@ -4,9 +4,9 @@ import QtQuick
 
 QtObject {
     property string mode: "system"
+    property bool systemDark: Application.styleHints.colorScheme === Qt.Dark
     readonly property bool dark: mode === "dark"
-                                 || (mode === "system"
-                                     && Application.styleHints.colorScheme === Qt.Dark)
+                                 || (mode === "system" && systemDark)
     readonly property color canvas: dark ? "#141D20" : "#F5F3ED"
     readonly property color surface: dark ? "#1C292C" : "#FFFFFF"
     readonly property color surfaceHover: dark ? "#27383B" : "#F0EEE8"

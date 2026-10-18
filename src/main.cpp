@@ -1,6 +1,7 @@
 #include "app/AppController.h"
 #include "app/ClipboardImageProvider.h"
 #include "platform/DesktopIntegration.h"
+#include "platform/SystemAppearance.h"
 #include "platform/gnome/GnomeBackend.h"
 #include "platform/gnome/PickerService.h"
 #include "storage/HistoryStore.h"
@@ -129,12 +130,14 @@ int main(int argc, char *argv[])
 
     HistoryStore store;
     store.open();
+    SystemAppearance appearance;
     AppController controller(&store, parser.isSet(clipboardOption)
                                 ? QStringLiteral("clipboard") : QStringLiteral("emoji"));
 
     QQmlApplicationEngine engine;
     engine.addImageProvider(QStringLiteral("clipboard"), new ClipboardImageProvider(&store));
-    engine.setInitialProperties({ { QStringLiteral("controller"), QVariant::fromValue(&controller) } });
+    engine.setInitialProperties({ { QStringLiteral("controller"), QVariant::fromValue(&controller) },
+                                  { QStringLiteral("systemAppearance"), QVariant::fromValue(&appearance) } });
     engine.loadFromModule("EmojiKeyboard", "Main");
     if (engine.rootObjects().isEmpty())
         return 1;

@@ -47,13 +47,14 @@ T.Button {
                                 : control.down || control.hovered ? Theme.surfaceHover : "transparent"
         border.color: control.activeFocus ? Theme.accent : "transparent"
         border.width: control.activeFocus ? 2 : 0
+        Behavior on color {
+            ColorAnimation { duration: 150 }
+        }
     }
 
     PickerToolTip {
-        parent: control
-        x: (control.width - width) / 2
-        y: control.height + Theme.layoutSize(3)
-        visible: control.hovered || control.activeFocus
+        anchorItem: control
+        requested: control.hovered || control.activeFocus
         text: control.categoryName
     }
 }

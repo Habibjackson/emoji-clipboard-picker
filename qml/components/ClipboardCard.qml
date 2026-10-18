@@ -17,12 +17,12 @@ T.Control {
     signal pinRequested(bool pinned)
     signal deleteRequested()
 
-    implicitHeight: Theme.layoutSize(kind === "image" ? 78 : 70)
+    implicitHeight: Theme.layoutSize(kind === "image" ? 110 : 76)
     padding: Theme.layoutSize(8)
     hoverEnabled: true
     activeFocusOnTab: true
     Accessible.role: Accessible.Button
-    Accessible.name: kind === "image" ? qsTr("Image, %1").arg(previewText) : previewText
+    Accessible.name: kind === "image" ? qsTr("Image saved %1").arg(timeText) : previewText
     Accessible.description: qsTr("Press Enter to copy")
     Keys.onReturnPressed: card.copyRequested()
     Keys.onEnterPressed: card.copyRequested()
@@ -32,85 +32,89 @@ T.Control {
         color: card.hovered ? Theme.surfaceHover : Theme.surface
         border.color: card.activeFocus ? Theme.accent : Theme.line
         border.width: card.activeFocus ? 2 : 1
+        Behavior on color {
+            ColorAnimation { duration: 150 }
+        }
     }
 
-    contentItem: RowLayout {
-        spacing: Theme.layoutSize(5)
+    contentItem: ColumnLayout {
+        spacing: Theme.layoutSize(3)
 
-        Item {
+        RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            spacing: Theme.layoutSize(5)
 
-            RowLayout {
-                anchors.fill: parent
-                spacing: Theme.layoutSize(8)
+            Item {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
 
-                Rectangle {
-                    Layout.preferredWidth: Theme.layoutSize(54)
-                    Layout.fillHeight: true
+                Image {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: Math.min(parent.width, Theme.layoutSize(84))
                     visible: card.kind === "image"
-                    radius: Theme.smallRadius
-                    color: Theme.rail
-
-                    Image {
-                        anchors.fill: parent
-                        anchors.margins: Theme.layoutSize(4)
-                        source: card.imageSource
-                        sourceSize.width: 108
-                        sourceSize.height: 108
-                        fillMode: Image.PreserveAspectFit
-                        asynchronous: true
-                        cache: false
-                    }
+                    source: card.imageSource
+                    sourceSize.width: 192
+                    sourceSize.height: 192
+                    fillMode: Image.PreserveAspectFit
+                    horizontalAlignment: Image.AlignLeft
+                    verticalAlignment: Image.AlignVCenter
+                    asynchronous: true
+                    cache: false
+                    Accessible.ignored: true
                 }
 
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    spacing: Theme.layoutSize(2)
+                Text {
+                    anchors.fill: parent
+                    visible: card.kind !== "image"
+                    text: card.previewText
+                    textFormat: Text.PlainText
+                    color: Theme.ink
+                    font.family: Theme.bodyFamily
+                    font.pixelSize: Theme.fontSize(12)
+                    maximumLineCount: 2
+                    wrapMode: Text.Wrap
+                    elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
+                    Accessible.ignored: true
+                }
 
-                    Text {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        text: card.previewText
-                        textFormat: Text.PlainText
-                        color: Theme.ink
-                        font.family: Theme.bodyFamily
-                        font.pixelSize: Theme.fontSize(12)
-                        maximumLineCount: 2
-                        wrapMode: Text.Wrap
-                        elide: Text.ElideRight
-                        verticalAlignment: Text.AlignVCenter
-                    }
-                    Text {
-                        text: card.timeText
-                        color: Theme.muted
-                        font.family: Theme.bodyFamily
-                        font.pixelSize: Theme.fontSize(10)
-                    }
+                TapHandler {
+                    onTapped: card.copyRequested()
+                }
+                HoverHandler {
+                    cursorShape: Qt.PointingHandCursor
                 }
             }
 
-            TapHandler {
-                onTapped: card.copyRequested()
+            IconButton {
+                iconName: card.pinned ? "unpin" : "pin"
+                enabled: card.pinned || card.canPin
+                accessibilityLabel: card.pinned ? qsTr("Unpin item")
+                                                 : card.canPin ? qsTr("Pin item")
+                                                               : qsTr("All five pins are in use")
+                onClicked: card.pinRequested(!card.pinned)
             }
-            HoverHandler {
-                cursorShape: Qt.PointingHandCursor
+            IconButton {
+                iconName: "delete"
+                accessibilityLabel: qsTr("Delete item")
+                onClicked: card.deleteRequested()
             }
         }
 
-        IconButton {
-            iconName: card.pinned ? "unpin" : "pin"
-            enabled: card.pinned || card.canPin
-            accessibilityLabel: card.pinned ? qsTr("Unpin item")
-                                             : card.canPin ? qsTr("Pin item")
-                                                           : qsTr("All five pins are in use")
-            onClicked: card.pinRequested(!card.pinned)
-        }
-        IconButton {
-            iconName: "delete"
-            accessibilityLabel: qsTr("Delete item")
-            onClicked: card.deleteRequested()
+        Text {
+            Layout.fillWidth: true
+            Layout.preferredHeight: Theme.fontSize(14)
+            text: card.timeText
+            textFormat: Text.PlainText
+            color: Theme.muted
+            font.family: Theme.bodyFamily
+            font.pixelSize: Theme.fontSize(10)
+            elide: Text.ElideRight
+            verticalAlignment: Text.AlignVCenter
+            Accessible.ignored: true
         }
     }
 }
