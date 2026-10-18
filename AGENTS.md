@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-`src/main.cpp` starts the Qt application; `qml/Main.qml` is the current window. Put application controllers in `src/app/`, list models in `src/models/`, SQLite code in `src/storage/`, and desktop backends in `src/platform/gnome/` or `src/platform/x11/`. Put reusable QML controls in `qml/components/` and screens in `qml/views/`. Emoji data and icons belong in `resources/`; the GNOME extension, desktop entry, D-Bus, and systemd files belong in `integration/`. Use `tests/unit/` for model and storage tests and `tests/integration/` for desktop behavior. Follow the implementation order in `TODO.md`.
+`src/main.cpp` starts the Qt application; `qml/Main.qml` is the current window. Put application controllers in `src/app/`, list models in `src/models/`, SQLite code in `src/storage/`, and desktop backends in `src/platform/gnome/` or `src/platform/x11/`. Put reusable QML controls in `qml/components/` and screens in `qml/views/`. Emoji data and icons belong in `resources/`; the GNOME extension, desktop entry, D-Bus, and systemd files belong in `integration/`. Use `tests/unit/` for model and storage tests and `tests/integration/` for desktop behavior. Put user and architecture guides in `docs/`; follow the implementation order in `TODO.md`.
 
 ## Build, Test, and Development Commands
 
@@ -24,7 +24,7 @@ Use four spaces and follow the existing brace style in C++. Name C++ types and Q
 
 ## Testing Guidelines
 
-Qt Test covers storage and clipboard controller behavior; a GJS test checks GNOME clipboard MIME classification. No coverage threshold is set. Add focused Qt Test cases for C++ behavior and Qt Quick Test cases for QML behavior as those modules arrive. Name test files `tst_<feature>.cpp` or `tst_<Feature>.qml`. Verify clipboard limits, pinning, deduplication, and restart persistence; exercise GNOME Wayland and X11 flows in their respective sessions.
+Qt Test covers models, storage, shortcuts, appearance, and desktop controllers. GJS checks GNOME clipboard and paste helpers; Qt Quick Test checks tooltips. No coverage threshold is set. Add focused tests for new behavior and name files `tst_<feature>.cpp` or `tst_<Feature>.qml`. Verify clipboard limits, pinning, deduplication, and restart persistence; exercise GNOME Wayland and X11 flows in their respective sessions.
 
 ## Commit & Pull Request Guidelines
 
@@ -32,4 +32,4 @@ Use short, imperative commit subjects such as `Add clipboard history model`. In 
 
 ## Privacy & Local Data
 
-Clipboard content is sensitive. Never commit captured data, databases, or payload-bearing logs. Store history only for the current user, enforce user-only file permissions, and avoid logging clipboard contents. Keep the five pinned and twenty unpinned item limits in storage transactions.
+Clipboard content is sensitive. Never commit captured data, databases, or payload-bearing logs. Store history only for the current user, enforce user-only file permissions, and avoid logging clipboard contents. Keep the five pinned and twenty unpinned item limits in storage transactions. See [Privacy and local data](docs/PRIVACY.md).

@@ -37,8 +37,11 @@
 *.user.*
 .idea/
 .vscode/
+/.claude/
+/.github/
 *.swp
 *~
+/.mcp.json
 
 # Local test/runtime data
 *.sqlite
@@ -52,3 +55,6 @@ __pycache__/
 .pytest_cache/
 core
 core.*
+
+# Local repository index and its credentials
+/.repowise/

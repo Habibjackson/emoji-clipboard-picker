@@ -2,6 +2,8 @@
 
 Qt 6.11/QML emoji picker with local clipboard history. Browse 3,963 Unicode Emoji 18.0 entries by category, search by English name or CLDR keyword, and keep recently used emoji. Skin tone sequences sit behind a chooser, while Recents keep the exact selection. Copied text and images survive restarts, with up to five permanent pins and twenty unpinned items. Remaining verification is tracked in [TODO.md](TODO.md).
 
+For setup and operation, see [Installation and daily use](docs/INSTALL.md), [Troubleshooting](docs/TROUBLESHOOTING.md), [Architecture](docs/ARCHITECTURE.md), and [Privacy and local data](docs/PRIVACY.md).
+
 ## Build
 
 Use Qt 6.11 and a C++20 compiler. For an official Qt installation in `~/Qt/6.11.1/gcc_64`:

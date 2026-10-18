@@ -2,7 +2,7 @@
 
 This extension targets GNOME Shell 50. It listens for `Meta.Selection::owner-changed` on the regular clipboard, classifies offered MIME types as text, image, or other, and exposes event counts over session D-Bus. For text and supported images it reads the current payload and sends up to the capture limit plus one byte to the Qt picker over the current user's session bus (1 MiB for text, 10 MiB for images). Qt enforces the limits and saves accepted items locally. The extension neither stores nor logs clipboard payloads. On X11 it stays inactive because the native Qt backend handles monitoring and shortcuts.
 
-For a normal user install, build the application and run `python3 scripts/emoji_keyboard.py install` from the repository root. This installs the extension, compiles its schema, starts the user service, and guides the known shortcut changes. `python3 scripts/emoji_keyboard.py recheck` reports known conflicts. See the root [README](../../README.md#install-and-shortcuts) for logout/login and removal steps.
+For a normal user install, build the application and run `python3 scripts/emoji_keyboard.py install` from the repository root. This installs the extension, compiles its schema, starts the user service, and guides the known shortcut changes. `python3 scripts/emoji_keyboard.py recheck` reports known conflicts. See [Installation and daily use](../../docs/INSTALL.md) for logout/login and removal steps.
 
 Build and install the probe with:
 

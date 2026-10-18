@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping build Emoji Keyboard. The first Qt 6.11/QML version supports emoji browsing and local clipboard history; planned desktop features and their order are in [TODO.md](TODO.md). Check the TODO and existing issues before starting a change. For a new storage format, desktop integration approach, or shortcut behavior, open an issue to discuss the design first.
+Thanks for helping build Emoji Keyboard. The current Qt 6.11/QML app supports emoji browsing, local clipboard history, GNOME Wayland integration, and an optional X11 backend. Read the [architecture](docs/ARCHITECTURE.md) and [installation guide](docs/INSTALL.md), then check [TODO.md](TODO.md) and existing issues before starting a change. For a new storage format, desktop integration approach, or shortcut behavior, open an issue to discuss the design first.
 
 ## Set up and verify
 
@@ -14,13 +14,13 @@ cmake --build build --target emoji-keyboard_qmllint
 ./build/emoji-keyboard
 ```
 
-The commands build the app, run its history and clipboard controller tests, lint QML, and open the picker. Keep generated files in `build/` and out of commits.
+The commands build the app, run registered tests, lint QML, and open the picker. Some integration tests are registered only when their desktop tools are installed. Keep generated files in `build/` and out of commits; see the [architecture guide](docs/ARCHITECTURE.md#storage-and-verification) for test details.
 
 ## Make a focused change
 
 Follow [AGENTS.md](AGENTS.md) for directory layout and naming. Keep QML responsible for presentation and interaction; put models, persistence, and desktop integration in C++. Add a focused test for new storage or model behavior. For GNOME Wayland or X11 changes, record the desktop session and applications used to verify copy, shortcut, focus, and paste behavior.
 
-Clipboard contents are private. Use synthetic test data, never attach real clipboard databases or screenshots containing sensitive content, and do not log payloads. Record the source, version, and redistribution license for any imported emoji data, artwork, or other third-party asset. The repository's MIT license does not replace those licenses.
+Clipboard contents are private. Use synthetic test data, never attach real clipboard databases or screenshots containing sensitive content, and do not log payloads. Read [Privacy and local data](docs/PRIVACY.md) before changing capture or storage. Record the source, version, and redistribution license for any imported emoji data, artwork, or other third-party asset. The repository's MIT license does not replace those licenses.
 
 ## Submit a pull request
 

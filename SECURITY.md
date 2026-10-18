@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-This project is a pre-release scaffold. Security fixes target the current `main` branch; no released version is supported yet.
+Security fixes target the current `main` branch. There are no tagged releases or long-term maintenance branches yet.
 
 ## Report a vulnerability
 
@@ -12,4 +12,4 @@ Maintainers will coordinate investigation and disclosure with the reporter. Ther
 
 ## Sensitive data expectations
 
-Clipboard history must remain local to the current user. Protect database files with user-only permissions, avoid payloads in logs and crash reports, and check that paste or clipboard restoration never overwrites a newer user copy. See [TODO.md](TODO.md) for the planned security and privacy checks.
+Clipboard history must remain local to the current user. Protect database files with user-only permissions, avoid payloads in logs and crash reports, and check that paste or clipboard restoration never overwrites a newer user copy. See [Privacy and local data](docs/PRIVACY.md) for current behavior and limits.
