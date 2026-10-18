@@ -54,7 +54,7 @@ private slots:
     void laterCopyOfTemporaryEmojiIsCaptured();
     void newerIdenticalEmojiCopyIsCaptured();
     void snapshotsSupportedClipboardBeforeEmoji();
-    void pasteShortcutOverridePersists();
+    void preferencesPersist();
     void doesNotLogClipboardPayload();
 };
 
@@ -453,7 +453,7 @@ void AppControllerTest::snapshotsSupportedClipboardBeforeEmoji()
     QCOMPARE(QImage::fromData(content, "PNG"), image);
 }
 
-void AppControllerTest::pasteShortcutOverridePersists()
+void AppControllerTest::preferencesPersist()
 {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
@@ -469,6 +469,7 @@ void AppControllerTest::pasteShortcutOverridePersists()
     {
         AppController controller(&store, QStringLiteral("emoji"));
         QCOMPARE(controller.pasteShortcutMode(), QStringLiteral("auto"));
+        QCOMPARE(controller.themeMode(), QStringLiteral("system"));
         QCOMPARE(controller.pasteShortcutFor(false), QStringLiteral("Ctrl+V"));
         QCOMPARE(controller.pasteShortcutFor(true), QStringLiteral("Ctrl+Shift+V"));
         QSignalSpy changed(&controller, &AppController::pasteShortcutModeChanged);
@@ -477,12 +478,22 @@ void AppControllerTest::pasteShortcutOverridePersists()
         QCOMPARE(controller.pasteShortcutFor(false), QStringLiteral("Ctrl+Shift+V"));
         controller.setPasteShortcutMode(QStringLiteral("invalid"));
         QCOMPARE(changed.size(), 1);
+        QSignalSpy themeChanged(&controller, &AppController::themeModeChanged);
+        controller.setThemeMode(QStringLiteral("dark"));
+        QCOMPARE(themeChanged.size(), 1);
+        controller.setThemeMode(QStringLiteral("invalid"));
+        QCOMPARE(themeChanged.size(), 1);
     }
     {
         AppController controller(&store, QStringLiteral("emoji"));
         QCOMPARE(controller.pasteShortcutMode(), QStringLiteral("ctrl-shift-v"));
+        QCOMPARE(controller.themeMode(), QStringLiteral("dark"));
         controller.setPasteShortcutMode(QStringLiteral("ctrl-v"));
         QCOMPARE(controller.pasteShortcutFor(true), QStringLiteral("Ctrl+V"));
+        controller.setThemeMode(QStringLiteral("light"));
+        QCOMPARE(controller.themeMode(), QStringLiteral("light"));
+        controller.setThemeMode(QStringLiteral("system"));
+        QCOMPARE(controller.themeMode(), QStringLiteral("system"));
     }
     QCoreApplication::setOrganizationName(previousOrganization);
     QCoreApplication::setApplicationName(previousApplication);

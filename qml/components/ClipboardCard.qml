@@ -99,22 +99,16 @@ T.Control {
             }
         }
 
-        ActionButton {
-            Layout.preferredWidth: Theme.layoutSize(card.pinned ? 57 : 45)
-            Layout.preferredHeight: Theme.layoutSize(44)
-            dense: true
-            text: card.pinned ? qsTr("Unpin") : qsTr("Pin")
+        IconButton {
+            iconName: card.pinned ? "unpin" : "pin"
             enabled: card.pinned || card.canPin
             accessibilityLabel: card.pinned ? qsTr("Unpin item")
                                              : card.canPin ? qsTr("Pin item")
                                                            : qsTr("All five pins are in use")
             onClicked: card.pinRequested(!card.pinned)
         }
-        ActionButton {
-            Layout.preferredWidth: Theme.layoutSize(54)
-            Layout.preferredHeight: Theme.layoutSize(44)
-            dense: true
-            text: qsTr("Delete")
+        IconButton {
+            iconName: "delete"
             accessibilityLabel: qsTr("Delete item")
             onClicked: card.deleteRequested()
         }

@@ -194,6 +194,10 @@ AppController::AppController(HistoryStore *store, QString initialView, QObject *
                                                 QStringLiteral("auto")).toString();
     m_pasteShortcutMode = savedMode == QStringLiteral("ctrl-v")
             || savedMode == QStringLiteral("ctrl-shift-v") ? savedMode : QStringLiteral("auto");
+    const QString savedTheme = QSettings().value(QStringLiteral("themeMode"),
+                                                 QStringLiteral("system")).toString();
+    m_themeMode = savedTheme == QStringLiteral("light") || savedTheme == QStringLiteral("dark")
+            ? savedTheme : QStringLiteral("system");
     protectClipboardDecoderLogs();
     if (!m_emojiModel.load(QStringLiteral(":/data/emoji-test.txt")))
         setStatus(tr("Emoji catalog could not be loaded"));
@@ -250,6 +254,23 @@ void AppController::setPasteShortcutMode(const QString &mode)
     m_pasteShortcutMode = mode;
     QSettings().setValue(QStringLiteral("pasteShortcutMode"), mode);
     emit pasteShortcutModeChanged();
+}
+
+QString AppController::themeMode() const
+{
+    return m_themeMode;
+}
+
+void AppController::setThemeMode(const QString &mode)
+{
+    if (mode != QStringLiteral("system") && mode != QStringLiteral("light")
+        && mode != QStringLiteral("dark"))
+        return;
+    if (m_themeMode == mode)
+        return;
+    m_themeMode = mode;
+    QSettings().setValue(QStringLiteral("themeMode"), mode);
+    emit themeModeChanged();
 }
 
 QString AppController::pasteShortcutFor(bool terminal) const

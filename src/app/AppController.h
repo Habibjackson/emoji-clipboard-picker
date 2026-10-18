@@ -23,6 +23,7 @@ class AppController : public QObject
     Q_PROPERTY(bool paused READ paused WRITE setPaused NOTIFY pausedChanged)
     Q_PROPERTY(QString pasteShortcutMode READ pasteShortcutMode WRITE setPasteShortcutMode
                    NOTIFY pasteShortcutModeChanged)
+    Q_PROPERTY(QString themeMode READ themeMode WRITE setThemeMode NOTIFY themeModeChanged)
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(QString attention READ attention NOTIFY attentionChanged)
     Q_PROPERTY(QString integrationWarning READ integrationWarning NOTIFY integrationWarningChanged)
@@ -42,6 +43,8 @@ public:
     void setPaused(bool paused);
     QString pasteShortcutMode() const;
     void setPasteShortcutMode(const QString &mode);
+    QString themeMode() const;
+    void setThemeMode(const QString &mode);
     QString pasteShortcutFor(bool terminal) const;
     QString status() const;
     QString attention() const;
@@ -73,6 +76,7 @@ signals:
     void itemCopied();
     void pausedChanged();
     void pasteShortcutModeChanged();
+    void themeModeChanged();
     void statusChanged();
     void attentionChanged();
     void integrationWarningChanged();
@@ -110,4 +114,5 @@ private:
     quint64 m_snapshotGeneration = 0;
     bool m_paused = false;
     QString m_pasteShortcutMode;
+    QString m_themeMode;
 };

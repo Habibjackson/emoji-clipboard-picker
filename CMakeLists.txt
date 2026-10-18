@@ -22,6 +22,9 @@ foreach(qml_file IN ITEMS
     qml/Main.qml
     qml/Theme.qml
     qml/components/ActionButton.qml
+    qml/components/GlyphIcon.qml
+    qml/components/PickerToolTip.qml
+    qml/components/IconButton.qml
     qml/components/CategoryButton.qml
     qml/components/SearchField.qml
     qml/components/EmojiTile.qml
@@ -50,6 +53,9 @@ qt_add_qml_module(emoji-keyboard
         qml/Main.qml
         qml/Theme.qml
         qml/components/ActionButton.qml
+        qml/components/GlyphIcon.qml
+        qml/components/PickerToolTip.qml
+        qml/components/IconButton.qml
         qml/components/CategoryButton.qml
         qml/components/SearchField.qml
         qml/components/EmojiTile.qml

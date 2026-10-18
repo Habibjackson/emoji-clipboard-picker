@@ -11,9 +11,10 @@ T.ApplicationWindow {
     property string currentView: controller.initialView
     readonly property int availableWidth: Screen.width > 0 ? Screen.width : 720
     readonly property int availableHeight: Screen.height > 0 ? Screen.height : 520
-    readonly property bool compactHeader: width <= Theme.layoutSize(350)
-                                          || height < Theme.layoutSize(410)
     readonly property bool shortHeight: height < Theme.layoutSize(380)
+    readonly property string themeModeLabel: controller.themeMode === "light" ? qsTr("Light")
+                                             : controller.themeMode === "dark" ? qsTr("Dark")
+                                                                                 : qsTr("System")
     readonly property string pasteModeLabel: controller.pasteShortcutMode === "ctrl-v"
                                               ? qsTr("Ctrl+V")
                                               : controller.pasteShortcutMode === "ctrl-shift-v"
@@ -44,52 +45,60 @@ T.ApplicationWindow {
         function onItemCopied() { window.hide() }
     }
 
+    Binding {
+        target: Theme
+        property: "mode"
+        value: window.controller.themeMode
+    }
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: Theme.layoutSize(10)
         spacing: Theme.layoutSize(6)
 
-        RowLayout {
-            visible: !window.compactHeader
+        Rectangle {
+            id: topBar
             Layout.fillWidth: true
             Layout.preferredHeight: Theme.layoutSize(44)
-            spacing: Theme.layoutSize(7)
+            radius: Theme.smallRadius
+            color: Theme.rail
+
+            Row {
+                id: viewTabs
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+
+                IconButton {
+                    iconName: "emoji"
+                    accessibilityLabel: qsTr("Emoji")
+                    selected: window.currentView === "emoji"
+                    onClicked: window.currentView = "emoji"
+                }
+                IconButton {
+                    iconName: "clipboard"
+                    accessibilityLabel: qsTr("Clipboard history")
+                    selected: window.currentView === "clipboard"
+                    onClicked: window.currentView = "clipboard"
+                }
+            }
 
             Item {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
+                id: dragArea
+                width: Theme.layoutSize(44)
+                height: parent.height
+                x: Math.min(Math.max(viewTabs.width + Theme.layoutSize(4),
+                                     (topBar.width - width) / 2),
+                            topActions.x - width - Theme.layoutSize(4))
                 Accessible.name: qsTr("Drag to move picker")
 
-                RowLayout {
-                    anchors.fill: parent
-                    spacing: Theme.layoutSize(7)
-
-                    Rectangle {
-                        Layout.preferredWidth: Theme.layoutSize(30)
-                        Layout.preferredHeight: Theme.layoutSize(30)
-                        radius: Theme.smallRadius
-                        color: Theme.accent
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "✦"
-                            color: Theme.accentInk
-                            font.pixelSize: Theme.fontSize(19)
-                            Accessible.ignored: true
-                        }
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: qsTr("Emoji Keyboard")
-                        color: Theme.ink
-                        font.family: Theme.bodyFamily
-                        font.pixelSize: Theme.fontSize(15)
-                        font.weight: Font.Bold
-                        elide: Text.ElideRight
-                    }
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: Theme.layoutSize(30)
+                    height: Theme.layoutSize(4)
+                    radius: height / 2
+                    color: Theme.muted
+                    Accessible.ignored: true
                 }
-
                 DragHandler {
                     target: null
                     cursorShape: Qt.SizeAllCursor
@@ -98,93 +107,37 @@ T.ApplicationWindow {
                             window.startSystemMove()
                     }
                 }
+                HoverHandler {
+                    id: dragHover
+                    cursorShape: Qt.SizeAllCursor
+                }
+                PickerToolTip {
+                    parent: dragArea
+                    x: (dragArea.width - width) / 2
+                    y: dragArea.height + Theme.layoutSize(3)
+                    visible: dragHover.hovered
+                    text: qsTr("Drag to move picker")
+                }
             }
 
-            ActionButton {
-                Layout.preferredWidth: Theme.layoutSize(44)
-                text: "⋯"
-                font.pixelSize: Theme.fontSize(20)
-                selected: actionsPopup.visible
-                accessibilityLabel: qsTr("History actions")
-                onClicked: actionsPopup.open()
-            }
-            ActionButton {
-                Layout.preferredWidth: Theme.layoutSize(44)
-                text: "×"
-                font.pixelSize: Theme.fontSize(20)
-                accessibilityLabel: qsTr("Hide picker")
-                onClicked: window.hide()
-            }
-        }
+            Row {
+                id: topActions
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
 
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: Theme.layoutSize(44)
-            radius: Theme.smallRadius
-            color: Theme.rail
-
-            RowLayout {
-                anchors.fill: parent
-                anchors.margins: Theme.layoutSize(2)
-                spacing: Theme.layoutSize(3)
-
-                Item {
-                    visible: window.compactHeader
-                    Layout.preferredWidth: Theme.layoutSize(32)
-                    Layout.fillHeight: true
-                    Accessible.name: qsTr("Drag to move picker")
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "⋮⋮"
-                        color: Theme.muted
-                        font.family: Theme.bodyFamily
-                        font.pixelSize: Theme.fontSize(17)
-                        Accessible.ignored: true
-                    }
-
-                    DragHandler {
-                        target: null
-                        cursorShape: Qt.SizeAllCursor
-                        onActiveChanged: {
-                            if (active)
-                                window.startSystemMove()
-                        }
-                    }
+                IconButton {
+                    iconName: window.controller.themeMode
+                    accessibilityLabel: qsTr("Theme: %1").arg(window.themeModeLabel)
+                    onClicked: themePopup.open()
                 }
-
-                ActionButton {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Layout.minimumWidth: 0
-                    text: qsTr("Emoji")
-                    selected: window.currentView === "emoji"
-                    onClicked: window.currentView = "emoji"
-                }
-                ActionButton {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Layout.minimumWidth: 0
-                    text: qsTr("Clipboard")
-                    selected: window.currentView === "clipboard"
-                    onClicked: window.currentView = "clipboard"
-                }
-                ActionButton {
-                    visible: window.compactHeader
-                    Layout.preferredWidth: Theme.layoutSize(44)
-                    Layout.fillHeight: true
-                    text: "⋯"
-                    font.pixelSize: Theme.fontSize(20)
+                IconButton {
+                    iconName: "menu"
+                    accessibilityLabel: qsTr("More actions")
                     selected: actionsPopup.visible
-                    accessibilityLabel: qsTr("History actions")
                     onClicked: actionsPopup.open()
                 }
-                ActionButton {
-                    visible: window.compactHeader
-                    Layout.preferredWidth: Theme.layoutSize(44)
-                    Layout.fillHeight: true
-                    text: "×"
-                    font.pixelSize: Theme.fontSize(20)
+                IconButton {
+                    iconName: "close"
                     accessibilityLabel: qsTr("Hide picker")
                     onClicked: window.hide()
                 }
@@ -285,10 +238,66 @@ T.ApplicationWindow {
     }
 
     T.Popup {
+        id: themePopup
+        parent: window.contentItem
+        x: window.width - width - Theme.layoutSize(10)
+        y: Theme.layoutSize(54)
+        width: Math.min(Theme.layoutSize(208), window.width - Theme.layoutSize(24))
+        height: themeChoices.implicitHeight + topPadding + bottomPadding
+        padding: Theme.layoutSize(8)
+        focus: true
+        closePolicy: T.Popup.CloseOnEscape | T.Popup.CloseOnPressOutside
+        onOpened: systemThemeButton.forceActiveFocus()
+
+        background: Rectangle {
+            radius: Theme.smallRadius
+            color: Theme.surface
+            border.color: Theme.line
+            border.width: 1
+        }
+        contentItem: ColumnLayout {
+            id: themeChoices
+            spacing: Theme.layoutSize(3)
+
+            ActionButton {
+                id: systemThemeButton
+                Layout.fillWidth: true
+                menuItem: true
+                text: qsTr("Follow system")
+                selected: window.controller.themeMode === "system"
+                onClicked: {
+                    window.controller.themeMode = "system"
+                    themePopup.close()
+                }
+            }
+            ActionButton {
+                Layout.fillWidth: true
+                menuItem: true
+                text: qsTr("Light")
+                selected: window.controller.themeMode === "light"
+                onClicked: {
+                    window.controller.themeMode = "light"
+                    themePopup.close()
+                }
+            }
+            ActionButton {
+                Layout.fillWidth: true
+                menuItem: true
+                text: qsTr("Dark")
+                selected: window.controller.themeMode === "dark"
+                onClicked: {
+                    window.controller.themeMode = "dark"
+                    themePopup.close()
+                }
+            }
+        }
+    }
+
+    T.Popup {
         id: actionsPopup
         parent: window.contentItem
         x: window.width - width - Theme.fontSize(12)
-        y: window.compactHeader ? Theme.layoutSize(54) : Theme.fontSize(58)
+        y: Theme.layoutSize(54)
         width: Math.min(Theme.fontSize(232), window.width - Theme.fontSize(24))
         height: actionsContent.implicitHeight + topPadding + bottomPadding
         padding: Theme.fontSize(8)
@@ -358,7 +367,7 @@ T.ApplicationWindow {
         id: pasteShortcutPopup
         parent: window.contentItem
         x: window.width - width - Theme.fontSize(12)
-        y: window.compactHeader ? Theme.layoutSize(54) : Theme.fontSize(58)
+        y: Theme.layoutSize(54)
         width: Math.min(Theme.fontSize(208), window.width - Theme.fontSize(24))
         height: pasteChoices.implicitHeight + topPadding + bottomPadding
         padding: Theme.fontSize(8)
@@ -481,7 +490,8 @@ T.ApplicationWindow {
     }
     Shortcut {
         sequences: ["Escape"]
-        enabled: !actionsPopup.visible && !pasteShortcutPopup.visible && !clearAllDialog.visible
+        enabled: !actionsPopup.visible && !themePopup.visible
+                 && !pasteShortcutPopup.visible && !clearAllDialog.visible
         onActivated: window.hide()
     }
     Shortcut {

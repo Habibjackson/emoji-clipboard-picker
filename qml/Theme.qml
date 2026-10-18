@@ -3,7 +3,10 @@ pragma Singleton
 import QtQuick
 
 QtObject {
-    readonly property bool dark: Application.styleHints.colorScheme === Qt.Dark
+    property string mode: "system"
+    readonly property bool dark: mode === "dark"
+                                 || (mode === "system"
+                                     && Application.styleHints.colorScheme === Qt.Dark)
     readonly property color canvas: dark ? "#141D20" : "#F5F3ED"
     readonly property color surface: dark ? "#1C292C" : "#FFFFFF"
     readonly property color surfaceHover: dark ? "#27383B" : "#F0EEE8"

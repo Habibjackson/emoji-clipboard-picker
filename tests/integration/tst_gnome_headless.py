@@ -9,6 +9,7 @@ the extension or change shortcuts in the current desktop session.
 from __future__ import annotations
 
 import ast
+import json
 import os
 from pathlib import Path
 import shutil
@@ -275,6 +276,13 @@ def pointer_button(pressed: bool) -> None:
         raise RuntimeError(f"Could not change test pointer button: {result.stderr.strip()}")
 
 
+def click_pointer(x: int, y: int) -> None:
+    set_pointer(x, y)
+    pointer_button(True)
+    time.sleep(0.1)
+    pointer_button(False)
+
+
 def picker_frame() -> tuple[int, int, int, int]:
     result = bus_call("org.emojikeyboard.ClipboardProbe",
                       "org.emojikeyboard.ClipboardProbe.PickerFrame",
@@ -448,7 +456,7 @@ def check_child(test_root: Path) -> int:
             focus_title("Emoji Keyboard")
             time.sleep(0.5)
             before = picker_frame()
-            grip_x, grip_y = before[0] + 28, before[1] + 32
+            grip_x, grip_y = before[0] + before[2] // 2, before[1] + 32
             set_pointer(grip_x, grip_y)
             pointer_button(True)
             try:
@@ -464,6 +472,33 @@ def check_child(test_root: Path) -> int:
                     or after[2:] != before[2:]:
                 raise RuntimeError(f"Picker did not move with its grip: {before} -> {after}")
             print("GNOME Wayland: visible picker moved by drag handle")
+
+            settings = call(str(ROOT / "build/emoji-keyboard"), "--print-data-paths",
+                            timeout=5)
+            if settings.returncode:
+                raise RuntimeError(f"Could not find picker settings: {settings.stderr.strip()}")
+            settings_path = Path(json.loads(settings.stdout)["settingsFile"])
+            theme_x = after[0] + after[2] - 120
+            theme_y = after[1] + 32
+            click_pointer(theme_x, theme_y)
+            click_pointer(theme_x, after[1] + 178)
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline:
+                if settings_path.is_file() and "themeMode=dark" in settings_path.read_text():
+                    break
+                time.sleep(0.1)
+            else:
+                raise RuntimeError("Theme button did not save Dark mode")
+            click_pointer(theme_x, theme_y)
+            click_pointer(theme_x, after[1] + 84)
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline:
+                if "themeMode=system" in settings_path.read_text():
+                    break
+                time.sleep(0.1)
+            else:
+                raise RuntimeError("Theme button did not restore system mode")
+            print("GNOME Wayland: theme button saved Dark and restored system mode")
 
             hide = bus_call("org.emojikeyboard.App", "org.emojikeyboard.App.Hide",
                             "/org/emojikeyboard/App")

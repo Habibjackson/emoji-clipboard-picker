@@ -7,9 +7,26 @@ T.Button {
     property bool selected: false
     property string categoryName: ""
 
-    text: categoryName
-    implicitHeight: Math.max(44, Theme.layoutSize(40))
-    implicitWidth: Math.max(Theme.layoutSize(58), label.implicitWidth + Theme.layoutSize(22))
+    function symbolFor(category) {
+        switch (category) {
+        case "All": return "🗂️"
+        case "Recent": return "🕘"
+        case "Smileys & Emotion": return "😀"
+        case "People & Body": return "🧍"
+        case "Component": return "🧩"
+        case "Animals & Nature": return "🐾"
+        case "Food & Drink": return "🍎"
+        case "Travel & Places": return "✈️"
+        case "Activities": return "⚽"
+        case "Objects": return "💡"
+        case "Symbols": return "🔣"
+        case "Flags": return "🏁"
+        default: return "❔"
+        }
+    }
+
+    implicitHeight: Theme.layoutSize(44)
+    implicitWidth: Theme.layoutSize(44)
     hoverEnabled: true
     Accessible.name: categoryName
     Keys.onReturnPressed: control.clicked()
@@ -17,11 +34,9 @@ T.Button {
 
     contentItem: Text {
         id: label
-        text: control.text
-        color: control.selected ? Theme.accent : Theme.muted
-        font.family: Theme.bodyFamily
-        font.pixelSize: Theme.fontSize(12)
-        font.weight: control.selected ? Font.DemiBold : Font.Medium
+        text: control.symbolFor(control.categoryName)
+        font.pixelSize: Theme.fontSize(22)
+        renderType: Text.NativeRendering
         verticalAlignment: Text.AlignVCenter
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
@@ -32,5 +47,13 @@ T.Button {
                                 : control.down || control.hovered ? Theme.surfaceHover : "transparent"
         border.color: control.activeFocus ? Theme.accent : "transparent"
         border.width: control.activeFocus ? 2 : 0
+    }
+
+    PickerToolTip {
+        parent: control
+        x: (control.width - width) / 2
+        y: control.height + Theme.layoutSize(3)
+        visible: control.hovered || control.activeFocus
+        text: control.categoryName
     }
 }

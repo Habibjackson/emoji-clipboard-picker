@@ -38,9 +38,9 @@ Item {
                 font.pixelSize: Theme.fontSize(11)
                 elide: Text.ElideRight
             }
-            ActionButton {
+            IconButton {
                 id: captureButton
-                text: qsTr("Capture current")
+                iconName: "capture"
                 prominent: true
                 enabled: !view.controller.paused
                 accessibilityLabel: enabled ? qsTr("Capture current clipboard item")
