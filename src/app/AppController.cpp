@@ -451,6 +451,14 @@ void AppController::reportShortcutFailure(const QString &shortcut)
     setStatus(message);
 }
 
+void AppController::clearShortcutFailure(const QString &shortcut)
+{
+    const QString message = tr("%1 is unavailable because another application owns the shortcut.")
+                                .arg(shortcut);
+    if (m_shortcutFailures.removeAll(message) > 0)
+        refreshIntegrationWarning();
+}
+
 void AppController::setIntegrationAvailability(bool available, const QString &reason)
 {
     const QString failure = available ? QString()

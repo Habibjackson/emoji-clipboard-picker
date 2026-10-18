@@ -77,6 +77,7 @@
 - [x] In a guided setup step, explain that this machine currently uses `Super+.` for IBus emoji input and `Super+V` for GNOME's message tray. Ask once before changing either setting. (A noninteractive install leaves conflicting settings untouched.)
 - [x] Save the original shortcut arrays; remove only the conflicting combinations, leaving other IBus and message-tray shortcuts intact. Restore each original value on uninstall only if the user has not changed it since setup. (Installer tests cover idempotence, preservation, and user edits.)
 - [x] Register the two GNOME extension keybindings, report conflicts, and offer a recheck action. On X11, report a failed key grab instead of claiming the shortcut works. (`setup-shortcuts` sets extension bindings after known conflicts clear; `recheck` reports their status. X11 already reports failed grabs in the picker.)
+- [x] Let users record separate emoji and clipboard opening shortcuts in the picker. Keep GNOME extension settings and X11 grabs persistent, preserve custom keys during setup, and retain the old X11 key if a new grab fails.
 - [x] Document the GNOME logout/login needed when first installing an extension, and provide clear extension/service status checks. (README and `status`/`recheck` commands.)
 - [x] Make uninstall disable the extension and service, remove installed integration files, restore eligible shortcuts, and offer a separate explicit choice to keep or purge the history database. (`uninstall --purge-history` is explicit; default keeps history.)
 

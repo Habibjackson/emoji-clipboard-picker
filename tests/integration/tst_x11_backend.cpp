@@ -1,4 +1,5 @@
 #include "app/AppController.h"
+#include "platform/ShortcutSettings.h"
 #include "platform/x11/X11Backend.h"
 #include "storage/HistoryStore.h"
 
@@ -26,6 +27,7 @@ private slots:
     void opensNearPointerAndFlipsAtEdges();
     void clipboardShortcutsAndPaste();
     void restoresEmojiClipboardAndCancelsSafely();
+    void customShortcutsPersistAndFailedGrabKeepsOldOne();
 };
 
 namespace {
@@ -39,6 +41,30 @@ void sendShortcut(Display *display, KeySym symbol)
     QVERIFY(XTestFakeKeyEvent(display, key, True, CurrentTime));
     QVERIFY(XTestFakeKeyEvent(display, key, False, CurrentTime));
     QVERIFY(XTestFakeKeyEvent(display, super, False, CurrentTime));
+    XFlush(display);
+}
+
+void sendCombo(Display *display, KeySym symbol, unsigned int modifiers)
+{
+    const KeyCode key = XKeysymToKeycode(display, symbol);
+    const KeyCode super = XKeysymToKeycode(display, XK_Super_L);
+    const KeyCode control = XKeysymToKeycode(display, XK_Control_L);
+    const KeyCode alt = XKeysymToKeycode(display, XK_Alt_L);
+    QVERIFY(key != 0);
+    if (modifiers & Mod4Mask)
+        QVERIFY(XTestFakeKeyEvent(display, super, True, CurrentTime));
+    if (modifiers & ControlMask)
+        QVERIFY(XTestFakeKeyEvent(display, control, True, CurrentTime));
+    if (modifiers & Mod1Mask)
+        QVERIFY(XTestFakeKeyEvent(display, alt, True, CurrentTime));
+    QVERIFY(XTestFakeKeyEvent(display, key, True, CurrentTime));
+    QVERIFY(XTestFakeKeyEvent(display, key, False, CurrentTime));
+    if (modifiers & Mod1Mask)
+        QVERIFY(XTestFakeKeyEvent(display, alt, False, CurrentTime));
+    if (modifiers & ControlMask)
+        QVERIFY(XTestFakeKeyEvent(display, control, False, CurrentTime));
+    if (modifiers & Mod4Mask)
+        QVERIFY(XTestFakeKeyEvent(display, super, False, CurrentTime));
     XFlush(display);
 }
 
@@ -349,6 +375,68 @@ void X11BackendTest::restoresEmojiClipboardAndCancelsSafely()
     QCOMPARE(pasteSpy.size(), 4);
     QCOMPARE(QGuiApplication::clipboard()->text(), QStringLiteral("🥑"));
     XCloseDisplay(display);
+}
+
+void X11BackendTest::customShortcutsPersistAndFailedGrabKeepsOldOne()
+{
+    QTemporaryDir directory;
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QVERIFY(store.open());
+    AppController controller(&store, QStringLiteral("emoji"));
+    QQuickWindow picker;
+    picker.setFlags(Qt::Tool | Qt::FramelessWindowHint);
+    ShortcutSettings settings;
+    X11Backend backend(&picker, &controller, &settings);
+    QVERIFY2(backend.isAvailable(), qPrintable(backend.errorString()));
+    settings.setX11Apply([&backend](const QString &view, const ShortcutSpec &spec) {
+        return backend.setShortcut(view, spec);
+    });
+    QSignalSpy shortcutSpy(&backend, &X11Backend::shortcutTriggered);
+    QVERIFY(shortcutSpy.isValid());
+    Display *display = XOpenDisplay(nullptr);
+    QVERIFY(display);
+
+    QVERIFY(settings.assignKey(QStringLiteral("emoji"), Qt::Key_E, Qt::MetaModifier));
+    QCOMPARE(settings.emojiLabel(), QStringLiteral("Super+E"));
+    QVERIFY(settings.assignKey(QStringLiteral("clipboard"), Qt::Key_B,
+                               Qt::ControlModifier | Qt::AltModifier));
+    QCOMPARE(settings.clipboardLabel(), QStringLiteral("Ctrl+Alt+B"));
+    QVERIFY(!settings.assignKey(QStringLiteral("clipboard"), Qt::Key_E, Qt::MetaModifier));
+    QVERIFY(settings.errorMessage().contains(QStringLiteral("different")));
+
+    sendCombo(display, XK_e, Mod4Mask);
+    QTRY_COMPARE_WITH_TIMEOUT(shortcutSpy.size(), 1, 3000);
+    QCOMPARE(shortcutSpy.at(0).at(0).toString(), QStringLiteral("emoji"));
+    picker.hide();
+    sendCombo(display, XK_b, ControlMask | Mod1Mask);
+    QTRY_COMPARE_WITH_TIMEOUT(shortcutSpy.size(), 2, 3000);
+    QCOMPARE(shortcutSpy.at(1).at(0).toString(), QStringLiteral("clipboard"));
+    picker.hide();
+
+    sendCombo(display, XK_period, Mod4Mask);
+    sendCombo(display, XK_v, Mod4Mask);
+    QTest::qWait(150);
+    QCOMPARE(shortcutSpy.size(), 2);
+
+    const KeyCode occupied = XKeysymToKeycode(display, XK_t);
+    QVERIFY(occupied != 0);
+    XGrabKey(display, occupied, Mod4Mask, DefaultRootWindow(display), False,
+             GrabModeAsync, GrabModeAsync);
+    XSync(display, False);
+    QVERIFY(!settings.assignKey(QStringLiteral("emoji"), Qt::Key_T, Qt::MetaModifier));
+    QCOMPARE(settings.emojiLabel(), QStringLiteral("Super+E"));
+    sendCombo(display, XK_e, Mod4Mask);
+    QTRY_COMPARE_WITH_TIMEOUT(shortcutSpy.size(), 3, 3000);
+    XUngrabKey(display, occupied, Mod4Mask, DefaultRootWindow(display));
+    XCloseDisplay(display);
+
+    QSettings persisted;
+    persisted.sync();
+    QCOMPARE(persisted.value(QStringLiteral("shortcuts/emoji")).toString(),
+             QStringLiteral("<Super>e"));
+    ShortcutSettings loaded;
+    QCOMPARE(loaded.emojiLabel(), QStringLiteral("Super+E"));
+    QCOMPARE(loaded.clipboardLabel(), QStringLiteral("Ctrl+Alt+B"));
 }
 
 int main(int argc, char *argv[])

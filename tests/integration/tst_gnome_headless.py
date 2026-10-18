@@ -134,7 +134,10 @@ def install_test_input(extension: Path) -> None:
     }
 
     InjectShortcut(view) {
-        const key = view === 'emoji' ? 52 : view === 'clipboard' ? 47 : 0;
+        const binding = view === 'emoji' ? this._settings.get_strv('show-emoji')[0] :
+            view === 'clipboard' ? this._settings.get_strv('show-clipboard')[0] : '';
+        const key = binding === '<Super>period' ? 52 : binding === '<Super>v' ? 47 :
+            binding === '<Super>e' ? 18 : 0;
         if (!key)
             return 'invalid';
         const state = JSON.stringify({
@@ -488,7 +491,10 @@ def check_child(test_root: Path) -> int:
                     break
                 time.sleep(0.1)
             else:
-                raise RuntimeError("Theme button did not save Dark mode")
+                saved = settings_path.read_text() if settings_path.is_file() else "missing"
+                raise RuntimeError(f"Theme button did not save Dark mode: frame={after}, "
+                                   f"click=({theme_x},{theme_y}), settings={saved!r}, "
+                                   f"app={app_log.read_text(errors='replace')[-500:]!r}")
             click_pointer(theme_x, theme_y)
             click_pointer(theme_x, after[1] + 84)
             deadline = time.monotonic() + 3
@@ -532,6 +538,26 @@ def check_child(test_root: Path) -> int:
                 except RuntimeError as error:
                     raise RuntimeError(f"{error}; injection state: {inject.stdout.strip()}") from error
             print("GNOME shortcuts: Super+. opens emoji; Super+V switches and toggles")
+
+            shortcut_schema = test_root / "data/gnome-shell/extensions" / UUID / "schemas"
+            update = call("gsettings", "--schemadir", str(shortcut_schema), "set",
+                          "org.gnome.shell.extensions.emoji-keyboard", "show-emoji",
+                          "['<Super>e']")
+            if update.returncode:
+                raise RuntimeError(f"Could not change isolated shortcut: {update.stderr.strip()}")
+            inject_shortcut("emoji")
+            wait_for_view("emoji")
+            hide = bus_call("org.emojikeyboard.App", "org.emojikeyboard.App.Hide",
+                            "/org/emojikeyboard/App")
+            if hide.returncode:
+                raise RuntimeError(f"Could not hide picker after custom shortcut: {hide.stderr.strip()}")
+            wait_for_view("emoji", visible=False)
+            update = call("gsettings", "--schemadir", str(shortcut_schema), "set",
+                          "org.gnome.shell.extensions.emoji-keyboard", "show-emoji",
+                          "['<Super>period']")
+            if update.returncode:
+                raise RuntimeError(f"Could not restore isolated shortcut: {update.stderr.strip()}")
+            print("GNOME shortcuts: changing Super+. to Super+E works without restarting Shell")
 
             title = "Emoji Keyboard Qt Wayland test target"
             target = subprocess.Popen([str(ROOT / "build/gnome_test_target"),

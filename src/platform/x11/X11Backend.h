@@ -1,6 +1,7 @@
 #pragma once
 
 #include "platform/DesktopIntegration.h"
+#include "platform/ShortcutSpec.h"
 
 #include <QString>
 
@@ -9,6 +10,7 @@ class AppController;
 class QQuickWindow;
 class QSocketNotifier;
 class QTimer;
+class ShortcutSettings;
 
 class X11Backend : public DesktopIntegration
 {
@@ -16,7 +18,7 @@ class X11Backend : public DesktopIntegration
 
 public:
     explicit X11Backend(QQuickWindow *window, AppController *controller,
-                        QObject *parent = nullptr);
+                        ShortcutSettings *shortcuts = nullptr, QObject *parent = nullptr);
     ~X11Backend() override;
 
     bool isAvailable() const override;
@@ -27,6 +29,7 @@ public:
     bool rememberTarget() override;
     void pasteSelection(bool emoji, quint64 snapshotGeneration) override;
     void cancel() override;
+    bool setShortcut(const QString &view, const ShortcutSpec &spec);
 
 signals:
     void clipboardOwnerChanged();
@@ -36,8 +39,8 @@ signals:
 private:
     void processEvents();
     void activateShortcutView(const QString &view);
-    bool grabShortcut(unsigned int keycode);
-    void releaseShortcut(unsigned int keycode);
+    bool grabShortcut(unsigned int keycode, unsigned int modifierMask);
+    void releaseShortcut(unsigned int keycode, unsigned int modifierMask);
     bool windowExists(unsigned long window) const;
     bool targetHasFocus(unsigned long target) const;
     bool targetIsTerminal(unsigned long window) const;
@@ -59,6 +62,10 @@ private:
     quint64 m_selectedClipboardRevision = 0;
     unsigned int m_emojiKeycode = 0;
     unsigned int m_clipboardKeycode = 0;
+    unsigned int m_emojiModifiers = 0;
+    unsigned int m_clipboardModifiers = 0;
+    QString m_emojiLabel;
+    QString m_clipboardLabel;
     unsigned int m_numLockMask = 0;
     int m_xfixesEventBase = 0;
     quint64 m_clipboardEvents = 0;

@@ -90,6 +90,54 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(self.values["emoji"], [])
         self.assertEqual(self.state["shortcuts"], {})
 
+    def test_guided_setup_keeps_custom_picker_keys(self):
+        self.values["emoji"] = ["<Super>e"]
+        self.values["clipboard"] = ["<Control><Alt>v"]
+        self.values["ibus"].append("<Super>e")
+        self.values["tray"].append("<Control><Alt>v")
+        setup.setup_shortcuts(self.paths, self.state, yes=True)
+        self.assertEqual(self.values["emoji"], ["<Super>e"])
+        self.assertEqual(self.values["clipboard"], ["<Control><Alt>v"])
+        self.assertEqual(self.values["ibus"], ["<Super>period", "<Super>semicolon"])
+        self.assertEqual(self.values["tray"], ["<Super>v", "<Super>m"])
+        self.assertNotIn("emoji", self.state["shortcuts"])
+        self.assertNotIn("clipboard", self.state["shortcuts"])
+
+    def test_duplicate_picker_keys_are_rejected(self):
+        self.values["emoji"] = ["<Super>e"]
+        self.values["clipboard"] = ["<Mod4>E"]
+        with self.assertRaises(setup.SetupError):
+            setup.setup_shortcuts(self.paths, self.state, yes=True)
+
+    def test_recheck_accepts_custom_keys_and_reports_real_overlap(self):
+        self.values["emoji"] = ["<Super>e"]
+        self.values["clipboard"] = ["<Control><Alt>b"]
+        for name in ("bin", "desktop", "dbus", "unit"):
+            self.paths[name].parent.mkdir(parents=True, exist_ok=True)
+            self.paths[name].write_text("installed")
+
+        def fake_run(*args, **_kwargs):
+            if args[:3] == ("gnome-extensions", "list", "--active"):
+                return subprocess_result(setup.UUID + "\n")
+            if args[0] == "gdbus":
+                return subprocess_result("PositionPicker(")
+            if args[:3] == ("systemctl", "--user", "is-active"):
+                return subprocess_result("active\n")
+            if args[:3] == ("systemctl", "--user", "is-enabled"):
+                return subprocess_result("enabled\n")
+            raise AssertionError(args)
+
+        with mock.patch.dict(os.environ, {"XDG_SESSION_TYPE": "wayland"}), \
+             mock.patch.object(setup, "run", side_effect=fake_run), \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as output:
+            self.assertEqual(setup.status(self.paths, recheck=True), 0)
+            self.assertIn("Known setup checks passed", output.getvalue())
+            self.values["ibus"].append("<Mod4>E")
+            output.truncate(0)
+            output.seek(0)
+            self.assertEqual(setup.status(self.paths, recheck=True), 1)
+            self.assertIn("ibus shortcut conflict", output.getvalue())
+
     def test_non_gnome_x11_leaves_gnome_settings_alone(self):
         with mock.patch.dict(os.environ, {"XDG_CURRENT_DESKTOP": "XFCE", "XDG_SESSION_TYPE": "x11"}):
             setup.setup_shortcuts(self.paths, self.state, yes=True)
@@ -246,7 +294,7 @@ class SetupTests(unittest.TestCase):
 
 
 def subprocess_result(output):
-    return type("Result", (), {"stdout": output})()
+    return type("Result", (), {"stdout": output, "returncode": 0})()
 
 
 if __name__ == "__main__":

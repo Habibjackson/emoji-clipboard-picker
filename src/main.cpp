@@ -1,6 +1,7 @@
 #include "app/AppController.h"
 #include "app/ClipboardImageProvider.h"
 #include "platform/DesktopIntegration.h"
+#include "platform/ShortcutSettings.h"
 #include "platform/SystemAppearance.h"
 #include "platform/gnome/GnomeBackend.h"
 #include "platform/gnome/PickerService.h"
@@ -131,13 +132,15 @@ int main(int argc, char *argv[])
     HistoryStore store;
     store.open();
     SystemAppearance appearance;
+    ShortcutSettings shortcuts;
     AppController controller(&store, parser.isSet(clipboardOption)
                                 ? QStringLiteral("clipboard") : QStringLiteral("emoji"));
 
     QQmlApplicationEngine engine;
     engine.addImageProvider(QStringLiteral("clipboard"), new ClipboardImageProvider(&store));
     engine.setInitialProperties({ { QStringLiteral("controller"), QVariant::fromValue(&controller) },
-                                  { QStringLiteral("systemAppearance"), QVariant::fromValue(&appearance) } });
+                                  { QStringLiteral("systemAppearance"), QVariant::fromValue(&appearance) },
+                                  { QStringLiteral("shortcutSettings"), QVariant::fromValue(&shortcuts) } });
     engine.loadFromModule("EmojiKeyboard", "Main");
     if (engine.rootObjects().isEmpty())
         return 1;
@@ -147,12 +150,16 @@ int main(int argc, char *argv[])
     std::unique_ptr<DesktopIntegration> desktop;
 #ifdef EMOJI_HAS_X11
     if (QGuiApplication::platformName() == QStringLiteral("xcb")) {
-        auto x11 = std::make_unique<X11Backend>(window, &controller);
+        auto x11 = std::make_unique<X11Backend>(window, &controller, &shortcuts);
         if (!x11->isAvailable()) {
             qWarning() << "X11 integration unavailable:" << x11->errorString();
             desktop = std::make_unique<CopyOnlyBackend>(window, &controller,
                                                         x11->errorString());
         } else {
+            X11Backend *backend = x11.get();
+            shortcuts.setX11Apply([backend](const QString &view, const ShortcutSpec &spec) {
+                return backend->setShortcut(view, spec);
+            });
             desktop = std::move(x11);
         }
     }

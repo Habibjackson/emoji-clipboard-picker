@@ -9,6 +9,7 @@ T.ApplicationWindow {
 
     required property AppController controller
     required property SystemAppearance systemAppearance
+    required property ShortcutSettings shortcutSettings
     property string currentView: controller.initialView
     readonly property int availableWidth: Screen.width > 0 ? Screen.width : 720
     readonly property int availableHeight: Screen.height > 0 ? Screen.height : 520
@@ -363,6 +364,16 @@ T.ApplicationWindow {
                     pasteShortcutPopup.open()
                 }
             }
+            ActionButton {
+                Layout.fillWidth: true
+                menuItem: true
+                text: qsTr("Keyboard shortcuts…")
+                accessibilityLabel: qsTr("Configure emoji and clipboard keyboard shortcuts")
+                onClicked: {
+                    actionsPopup.close()
+                    keyboardShortcutsPopup.open()
+                }
+            }
             Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 1
@@ -387,6 +398,80 @@ T.ApplicationWindow {
                     actionsPopup.close()
                     clearAllDialog.open()
                 }
+            }
+        }
+    }
+
+    T.Popup {
+        id: keyboardShortcutsPopup
+        parent: window.contentItem
+        x: window.width - width - Theme.layoutSize(10)
+        y: Theme.layoutSize(54)
+        width: Math.min(Theme.layoutSize(310), window.width - Theme.layoutSize(24))
+        height: shortcutChoices.implicitHeight + topPadding + bottomPadding
+        padding: Theme.layoutSize(10)
+        focus: true
+        closePolicy: T.Popup.CloseOnEscape | T.Popup.CloseOnPressOutside
+        onOpened: {
+            window.shortcutSettings.reload()
+            emojiRecorder.focusShortcut()
+        }
+        enter: Transition {
+            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 150 }
+        }
+        exit: Transition {
+            NumberAnimation { property: "opacity"; from: 1; to: 0; duration: 100 }
+        }
+        background: Rectangle {
+            radius: Theme.smallRadius
+            color: Theme.surface
+            border.color: Theme.line
+            border.width: 1
+        }
+        contentItem: ColumnLayout {
+            id: shortcutChoices
+            spacing: Theme.layoutSize(7)
+
+            Text {
+                text: qsTr("Open picker")
+                color: Theme.ink
+                font.family: Theme.bodyFamily
+                font.pixelSize: Theme.fontSize(13)
+                font.weight: Font.DemiBold
+            }
+            ShortcutRecorder {
+                id: emojiRecorder
+                Layout.fillWidth: true
+                settings: window.shortcutSettings
+                viewName: "emoji"
+                title: qsTr("Emoji")
+            }
+            ShortcutRecorder {
+                Layout.fillWidth: true
+                settings: window.shortcutSettings
+                viewName: "clipboard"
+                title: qsTr("Clipboard")
+            }
+            Text {
+                Layout.fillWidth: true
+                text: window.shortcutSettings.available
+                      ? qsTr("Press Super+key or Ctrl+Alt+key. Esc cancels.")
+                      : qsTr("Install and start GNOME or X11 integration to edit shortcuts.")
+                textFormat: Text.PlainText
+                color: Theme.muted
+                font.family: Theme.bodyFamily
+                font.pixelSize: Theme.fontSize(10)
+                wrapMode: Text.Wrap
+            }
+            Text {
+                Layout.fillWidth: true
+                visible: window.shortcutSettings.errorMessage.length > 0
+                text: window.shortcutSettings.errorMessage
+                textFormat: Text.PlainText
+                color: Theme.accent
+                font.family: Theme.bodyFamily
+                font.pixelSize: Theme.fontSize(10)
+                wrapMode: Text.Wrap
             }
         }
     }

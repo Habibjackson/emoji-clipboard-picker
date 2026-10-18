@@ -28,6 +28,7 @@ foreach(qml_file IN ITEMS
     qml/components/CategoryButton.qml
     qml/components/SearchField.qml
     qml/components/EmojiTile.qml
+    qml/components/ShortcutRecorder.qml
     qml/components/ClipboardCard.qml
     qml/views/EmojiView.qml
     qml/views/ClipboardView.qml
@@ -59,6 +60,7 @@ qt_add_qml_module(emoji-keyboard
         qml/components/CategoryButton.qml
         qml/components/SearchField.qml
         qml/components/EmojiTile.qml
+        qml/components/ShortcutRecorder.qml
         qml/components/ClipboardCard.qml
         qml/views/EmojiView.qml
         qml/views/ClipboardView.qml
@@ -66,6 +68,8 @@ qt_add_qml_module(emoji-keyboard
         src/app/AppController.h src/app/AppController.cpp
         src/app/ClipboardImageProvider.h src/app/ClipboardImageProvider.cpp
         src/platform/SystemAppearance.h src/platform/SystemAppearance.cpp
+        src/platform/ShortcutSpec.h src/platform/ShortcutSpec.cpp
+        src/platform/ShortcutSettings.h src/platform/ShortcutSettings.cpp
         src/models/EmojiModel.h src/models/EmojiModel.cpp
         src/models/ClipboardModel.h src/models/ClipboardModel.cpp
         src/storage/HistoryStore.h src/storage/HistoryStore.cpp
@@ -142,6 +146,25 @@ if(BUILD_TESTING)
     target_include_directories(tst_history_store PRIVATE src)
     target_link_libraries(tst_history_store PRIVATE Qt6::Core Qt6::Gui Qt6::Sql Qt6::Test)
     add_test(NAME history_store COMMAND tst_history_store)
+
+    qt_add_executable(tst_shortcut_spec
+        tests/unit/tst_shortcut_spec.cpp
+        src/platform/ShortcutSpec.cpp)
+    target_include_directories(tst_shortcut_spec PRIVATE src)
+    target_link_libraries(tst_shortcut_spec PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME shortcut_spec COMMAND tst_shortcut_spec)
+
+    qt_add_executable(tst_shortcut_settings
+        tests/unit/tst_shortcut_settings.cpp
+        src/platform/ShortcutSpec.cpp
+        src/platform/ShortcutSettings.cpp)
+    target_include_directories(tst_shortcut_settings PRIVATE src)
+    target_compile_definitions(tst_shortcut_settings PRIVATE
+        TEST_SCHEMA_SOURCE="${CMAKE_CURRENT_SOURCE_DIR}/integration/gnome-extension/schemas/org.gnome.shell.extensions.emoji-keyboard.gschema.xml")
+    target_link_libraries(tst_shortcut_settings PRIVATE Qt6::Gui Qt6::Qml Qt6::Test)
+    add_test(NAME shortcut_settings COMMAND tst_shortcut_settings)
+    set_tests_properties(shortcut_settings PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
     qt_add_executable(tst_emoji_model
         tests/unit/tst_emoji_model.cpp
@@ -243,6 +266,7 @@ if(BUILD_TESTING)
             tests/integration/tst_x11_backend.cpp
             src/platform/DesktopIntegration.h src/platform/DesktopIntegration.cpp
             src/platform/x11/X11Backend.h src/platform/x11/X11Backend.cpp
+            src/platform/ShortcutSpec.cpp src/platform/ShortcutSettings.cpp
             src/app/AppController.cpp
             src/models/EmojiModel.cpp
             src/models/ClipboardModel.cpp

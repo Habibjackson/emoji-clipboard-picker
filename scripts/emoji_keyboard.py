@@ -166,7 +166,8 @@ def gsettings_set(paths: dict[str, Path], name: str, values: list[str]) -> None:
 
 
 def matches(value: str, target: str) -> bool:
-    return value.casefold().replace("<mod4>", "<super>") == target.casefold()
+    normalize = lambda shortcut: shortcut.casefold().replace("<mod4>", "<super>")
+    return normalize(value) == normalize(target)
 
 
 def change_shortcut(paths: dict[str, Path], state: dict, name: str, replacement: list[str]) -> bool:
@@ -207,17 +208,23 @@ def setup_shortcuts(paths: dict[str, Path], state: dict, yes: bool = False) -> N
         return
     if not (paths["extension"] / "schemas/gschemas.compiled").exists():
         raise SetupError("Install the GNOME extension before configuring its shortcuts")
+    picker = {name: gsettings_get(paths, name) for name in ("emoji", "clipboard")}
+    desired = {name: values or [SHORTCUTS[name][2]] for name, values in picker.items()}
+    if any(matches(emoji, clipboard)
+           for emoji in desired["emoji"] for clipboard in desired["clipboard"]):
+        raise SetupError("Emoji and clipboard shortcuts overlap; choose different keys in the picker")
     current = {name: gsettings_get(paths, name) for name in ("ibus", "tray")}
+    requested = desired["emoji"] + desired["clipboard"]
     changes = {
-        name: [item for item in values if not matches(item, SHORTCUTS[name][2])]
+        name: [item for item in values if not any(matches(item, key) for key in requested)]
         for name, values in current.items()
     }
     conflicts = [name for name in current if changes[name] != current[name]]
     if conflicts:
-        print("GNOME currently uses Super+. for IBus emoji input and Super+V for the message tray.")
+        print("GNOME or IBus currently uses a requested picker shortcut.")
         for name in conflicts:
             print(f"  {name}: {current[name]} -> {changes[name]}")
-        print("Only those combinations will be removed; other shortcuts stay in place.")
+        print("Only overlapping combinations will be removed; other shortcuts stay in place.")
         if not yes:
             if not sys.stdin.isatty():
                 print("Shortcuts unchanged. Run 'scripts/emoji_keyboard.py setup-shortcuts' interactively.")
@@ -229,11 +236,12 @@ def setup_shortcuts(paths: dict[str, Path], state: dict, yes: bool = False) -> N
         if name in conflicts and not change_shortcut(paths, state, name, changes[name]):
             return
     # A failed or user-edited desktop setting must never leave the extension claiming the key.
-    if any(any(matches(value, SHORTCUTS[name][2]) for value in gsettings_get(paths, name))
+    if any(any(matches(value, key) for value in gsettings_get(paths, name)
+               for key in requested)
            for name in ("ibus", "tray")):
         print("Known GNOME conflicts remain; picker shortcuts were not enabled.", file=sys.stderr)
         return
-    registered = all(change_shortcut(paths, state, name, [SHORTCUTS[name][2]])
+    registered = all(picker[name] or change_shortcut(paths, state, name, desired[name])
                      for name in ("emoji", "clipboard"))
     if registered:
         print("Picker shortcuts configured. Run 'scripts/emoji_keyboard.py recheck' after GNOME login.")
@@ -441,15 +449,22 @@ def status(paths: dict[str, Path], recheck: bool) -> int:
     print(f"Start at login: {enabled_service.stdout.strip() or 'unavailable'}")
     if enabled_service.stdout.strip() != "enabled":
         problems.append("service startup")
-    names = ["ibus", "tray"] if gnome else []
     if extension and gnome and not x11:
-        names += ["emoji", "clipboard"]
-    for name in names:
-        values = gsettings_get(paths, name)
-        print(f"{name} shortcuts: {values}")
-        found = any(matches(value, SHORTCUTS[name][2]) for value in values)
-        if (name in ("ibus", "tray") and found) or (name in ("emoji", "clipboard") and not found):
-            problems.append(f"{name} shortcut")
+        bindings = {name: gsettings_get(paths, name)
+                    for name in ("ibus", "tray", "emoji", "clipboard")}
+        for name, values in bindings.items():
+            print(f"{name} shortcuts: {values}")
+        picker_bindings = bindings["emoji"] + bindings["clipboard"]
+        for name in ("emoji", "clipboard"):
+            if not bindings[name]:
+                problems.append(f"{name} shortcut")
+        if any(matches(emoji, clipboard)
+               for emoji in bindings["emoji"] for clipboard in bindings["clipboard"]):
+            problems.append("picker shortcut overlap")
+        for name in ("ibus", "tray"):
+            if any(matches(value, key) for value in bindings[name]
+                   for key in picker_bindings):
+                problems.append(f"{name} shortcut conflict")
     if problems:
         print("Needs attention: " + ", ".join(problems))
         if recheck:

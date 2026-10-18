@@ -1,6 +1,7 @@
 #include "X11Backend.h"
 
 #include "app/AppController.h"
+#include "platform/ShortcutSettings.h"
 
 #include <QQuickWindow>
 #include <QClipboard>
@@ -79,9 +80,24 @@ constexpr std::array terminalClasses = {
     "org.gnome.ptyxis", "org.gnome.terminal", "org.wezfurlong.wezterm",
     "ptyxis", "terminator", "tilix",
 };
+
+unsigned int xModifiers(Qt::KeyboardModifiers modifiers)
+{
+    unsigned int mask = 0;
+    if (modifiers & Qt::MetaModifier)
+        mask |= Mod4Mask;
+    if (modifiers & Qt::ControlModifier)
+        mask |= ControlMask;
+    if (modifiers & Qt::AltModifier)
+        mask |= Mod1Mask;
+    if (modifiers & Qt::ShiftModifier)
+        mask |= ShiftMask;
+    return mask;
+}
 }
 
-X11Backend::X11Backend(QQuickWindow *window, AppController *controller, QObject *parent)
+X11Backend::X11Backend(QQuickWindow *window, AppController *controller,
+                       ShortcutSettings *shortcuts, QObject *parent)
     : DesktopIntegration(window, controller, parent)
 {
     m_display = XOpenDisplay(nullptr);
@@ -109,19 +125,26 @@ X11Backend::X11Backend(QQuickWindow *window, AppController *controller, QObject 
         m_error = tr("Could not watch the X11 clipboard");
         return;
     }
-    m_emojiKeycode = XKeysymToKeycode(m_display, XK_period);
-    m_clipboardKeycode = XKeysymToKeycode(m_display, XK_v);
+    const ShortcutSpec emoji = shortcuts ? shortcuts->spec(QStringLiteral("emoji"))
+                                         : ShortcutSpec::emojiDefault();
+    const ShortcutSpec clipboard = shortcuts ? shortcuts->spec(QStringLiteral("clipboard"))
+                                             : ShortcutSpec::clipboardDefault();
+    m_emojiKeycode = XKeysymToKeycode(m_display,
+        XStringToKeysym(emoji.keyName.toLatin1().constData()));
+    m_clipboardKeycode = XKeysymToKeycode(m_display,
+        XStringToKeysym(clipboard.keyName.toLatin1().constData()));
+    m_emojiModifiers = xModifiers(emoji.modifiers);
+    m_clipboardModifiers = xModifiers(clipboard.modifiers);
+    m_emojiLabel = emoji.label;
+    m_clipboardLabel = clipboard.label;
     m_numLockMask = numLockMask();
-    if (!m_emojiKeycode || !m_clipboardKeycode) {
-        m_error = tr("The X11 keyboard layout does not provide the required keys");
-        return;
-    }
-    m_emojiGrabbed = grabShortcut(m_emojiKeycode);
-    m_clipboardGrabbed = grabShortcut(m_clipboardKeycode);
+    m_emojiGrabbed = m_emojiKeycode && grabShortcut(m_emojiKeycode, m_emojiModifiers);
+    m_clipboardGrabbed = m_clipboardKeycode
+        && grabShortcut(m_clipboardKeycode, m_clipboardModifiers);
     if (!m_emojiGrabbed && m_controller)
-        m_controller->reportShortcutFailure(QStringLiteral("Super+."));
+        m_controller->reportShortcutFailure(m_emojiLabel);
     if (!m_clipboardGrabbed && m_controller)
-        m_controller->reportShortcutFailure(QStringLiteral("Super+V"));
+        m_controller->reportShortcutFailure(m_clipboardLabel);
 
     m_notifier = new QSocketNotifier(XConnectionNumber(m_display), QSocketNotifier::Read, this);
     connect(m_notifier, &QSocketNotifier::activated, this, &X11Backend::processEvents);
@@ -166,9 +189,9 @@ X11Backend::~X11Backend()
     if (m_notifier)
         m_notifier->setEnabled(false);
     if (m_emojiGrabbed)
-        releaseShortcut(m_emojiKeycode);
+        releaseShortcut(m_emojiKeycode, m_emojiModifiers);
     if (m_clipboardGrabbed)
-        releaseShortcut(m_clipboardKeycode);
+        releaseShortcut(m_clipboardKeycode, m_clipboardModifiers);
     XCloseDisplay(m_display);
 }
 
@@ -185,6 +208,56 @@ QString X11Backend::errorString() const
 quint64 X11Backend::clipboardEventCount() const
 {
     return m_clipboardEvents;
+}
+
+bool X11Backend::setShortcut(const QString &view, const ShortcutSpec &spec)
+{
+    if (!isAvailable() || !spec.isValid()
+        || (view != QStringLiteral("emoji") && view != QStringLiteral("clipboard")))
+        return false;
+    const auto keycode = XKeysymToKeycode(m_display,
+        XStringToKeysym(spec.keyName.toLatin1().constData()));
+    if (!keycode)
+        return false;
+    const unsigned int modifiers = xModifiers(spec.modifiers);
+    const bool emoji = view == QStringLiteral("emoji");
+    unsigned int &oldKeycode = emoji ? m_emojiKeycode : m_clipboardKeycode;
+    unsigned int &oldModifiers = emoji ? m_emojiModifiers : m_clipboardModifiers;
+    bool &oldGrabbed = emoji ? m_emojiGrabbed : m_clipboardGrabbed;
+    QString &oldLabel = emoji ? m_emojiLabel : m_clipboardLabel;
+    if (keycode == (emoji ? m_clipboardKeycode : m_emojiKeycode)
+        && modifiers == (emoji ? m_clipboardModifiers : m_emojiModifiers))
+        return false;
+    if (keycode == oldKeycode && modifiers == oldModifiers) {
+        if (oldGrabbed)
+            return true;
+        oldGrabbed = grabShortcut(keycode, modifiers);
+        if (oldGrabbed && m_controller)
+            m_controller->clearShortcutFailure(oldLabel);
+        return oldGrabbed;
+    }
+    XGrabServer(m_display);
+    if (oldGrabbed)
+        releaseShortcut(oldKeycode, oldModifiers);
+    if (!grabShortcut(keycode, modifiers)) {
+        if (oldGrabbed && !grabShortcut(oldKeycode, oldModifiers)) {
+            oldGrabbed = false;
+            if (m_controller)
+                m_controller->reportShortcutFailure(oldLabel);
+        }
+        XUngrabServer(m_display);
+        XFlush(m_display);
+        return false;
+    }
+    XUngrabServer(m_display);
+    XFlush(m_display);
+    if (m_controller)
+        m_controller->clearShortcutFailure(oldLabel);
+    oldKeycode = keycode;
+    oldModifiers = modifiers;
+    oldLabel = spec.label;
+    oldGrabbed = true;
+    return true;
 }
 
 void X11Backend::cancel()
@@ -217,11 +290,15 @@ void X11Backend::processEvents()
             ++m_clipboardEvents;
             emit clipboardOwnerChanged();
             captureClipboard(QString());
-        } else if (event.type == KeyPress && (event.xkey.state & Mod4Mask)) {
+        } else if (event.type == KeyPress) {
+            const unsigned int modifiers = event.xkey.state
+                & (ShiftMask | ControlMask | Mod1Mask | Mod4Mask);
             m_lastShortcutTime = event.xkey.time;
-            if (m_emojiGrabbed && event.xkey.keycode == m_emojiKeycode) {
+            if (m_emojiGrabbed && event.xkey.keycode == m_emojiKeycode
+                && modifiers == m_emojiModifiers) {
                 activateShortcutView(QStringLiteral("emoji"));
-            } else if (m_clipboardGrabbed && event.xkey.keycode == m_clipboardKeycode) {
+            } else if (m_clipboardGrabbed && event.xkey.keycode == m_clipboardKeycode
+                       && modifiers == m_clipboardModifiers) {
                 activateShortcutView(QStringLiteral("clipboard"));
             }
         }
@@ -474,11 +551,11 @@ void X11Backend::restoreClipboard(quint64 snapshotGeneration, unsigned long temp
         AppController::ClipboardRestoreResult::Restored);
 }
 
-bool X11Backend::grabShortcut(unsigned int keycode)
+bool X11Backend::grabShortcut(unsigned int keycode, unsigned int modifierMask)
 {
-    std::array<unsigned int, 4> modifiers = {Mod4Mask, Mod4Mask | LockMask,
-                                             Mod4Mask | m_numLockMask,
-                                             Mod4Mask | LockMask | m_numLockMask};
+    std::array<unsigned int, 4> modifiers = {modifierMask, modifierMask | LockMask,
+                                             modifierMask | m_numLockMask,
+                                             modifierMask | LockMask | m_numLockMask};
     std::sort(modifiers.begin(), modifiers.end());
     const auto end = std::unique(modifiers.begin(), modifiers.end());
     for (auto it = modifiers.begin(); it != end; ++it) {
@@ -486,16 +563,22 @@ bool X11Backend::grabShortcut(unsigned int keycode)
                 XGrabKey(m_display, int(keycode), mask, m_root, False,
                          GrabModeAsync, GrabModeAsync);
             })) {
-            releaseShortcut(keycode);
+            releaseShortcut(keycode, modifierMask);
             return false;
         }
     }
     return true;
 }
 
-void X11Backend::releaseShortcut(unsigned int keycode)
+void X11Backend::releaseShortcut(unsigned int keycode, unsigned int modifierMask)
 {
-    XUngrabKey(m_display, int(keycode), AnyModifier, m_root);
+    std::array<unsigned int, 4> modifiers = {modifierMask, modifierMask | LockMask,
+                                             modifierMask | m_numLockMask,
+                                             modifierMask | LockMask | m_numLockMask};
+    std::sort(modifiers.begin(), modifiers.end());
+    const auto end = std::unique(modifiers.begin(), modifiers.end());
+    for (auto it = modifiers.begin(); it != end; ++it)
+        XUngrabKey(m_display, int(keycode), *it, m_root);
     XFlush(m_display);
 }
 

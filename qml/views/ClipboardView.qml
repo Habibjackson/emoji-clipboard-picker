@@ -45,6 +45,9 @@ Item {
                 enabled: !view.controller.paused
                 accessibilityLabel: enabled ? qsTr("Capture current clipboard item")
                                             : qsTr("Resume capture before saving the current clipboard")
+                toolTipText: enabled
+                             ? qsTr("Save the clipboard item now if automatic capture missed it")
+                             : qsTr("Resume capture before saving the current clipboard")
                 onClicked: view.controller.captureNow()
                 KeyNavigation.tab: list
             }
